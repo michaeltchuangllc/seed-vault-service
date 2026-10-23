@@ -151,7 +151,7 @@ class WalletServiceDemoViewModel(
      */
     fun signDemoMessage(seed: SeedVaultSeed) {
         val data = SIGN_DEMO_MESSAGE.toByteArray()
-        requestConfirmation(seedVaultClient.confirmSignBytesIntent(seed.id, data)) { signDemoMessageApproved(seed) }
+        requestConfirmation(seedVaultClient.confirmSignBytesIntent(seed.address, data)) { signDemoMessageApproved(seed) }
     }
 
     private fun signDemoMessageApproved(seed: SeedVaultSeed) {
@@ -161,7 +161,7 @@ class WalletServiceDemoViewModel(
             try {
                 val signature =
                     withContext(Dispatchers.IO) {
-                        seedVaultClient.signBytes(seed.id, SIGN_DEMO_MESSAGE.toByteArray())
+                        seedVaultClient.signBytes(seed.address, SIGN_DEMO_MESSAGE.toByteArray())
                     }
                 _uiState.update {
                     it.copy(
@@ -215,8 +215,8 @@ class WalletServiceDemoViewModel(
     }
 
     /**
-     * Send a 0 ALGO payment from a seed's account to itself on TestNet. The vault builds and signs
-     * the transaction; the SDK handles network parameters and submission.
+     * Send a 0 ALGO payment from a seed's account to itself on TestNet. The SDK builds the unsigned
+     * transaction, the vault signs it over signTransaction, and the SDK submits it.
      */
     fun sendZeroAlgoPayment(seed: SeedVaultSeed) {
         _uiState.update {
@@ -225,7 +225,7 @@ class WalletServiceDemoViewModel(
 
         viewModelScope.launch {
             try {
-                val payment = algorandPaymentClient.preparePayment(seed.id, seed.address, 0L)
+                val payment = algorandPaymentClient.preparePayment(seed.address, seed.address, 0L)
                 requestConfirmation(payment.confirmationIntent) {
                     signAndSendPayment(seed) { algorandPaymentClient.signAndSend(payment) }
                 }

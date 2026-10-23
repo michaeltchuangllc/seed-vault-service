@@ -1,6 +1,5 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import com.michaeltchuang.walletsdk.core.algosdk.getFalcon25MnemonicFromEntropy
 import com.michaeltchuang.walletsdk.core.algosdk.getFalcon25SeedFromEntropy
 import com.michaeltchuang.walletsdk.core.algosdk.recoverFalcon25Account
@@ -66,13 +65,10 @@ internal class RoomSeedKeyVault : SeedKeyVault {
         }
     }
 
-    override suspend fun signAlgorandPayment(
+    override suspend fun signTransaction(
         seed: StoredSeed,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray? {
-        val transaction = buildFalconPayment(seed.address, receiver, amountMicroAlgos, params) ?: return null
         ensureEncryptionKey()
         val entropy = decryptByteArray(seed.encryptedEntropy)
         val falconSeed =

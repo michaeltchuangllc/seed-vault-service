@@ -1,6 +1,5 @@
 package com.michaeltchuang.seedvault.service.data
 
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import com.michaeltchuang.seedvault.service.domain.model.AuthorizedApp
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
@@ -58,14 +57,12 @@ class FakeSeedVaultRepository(
         return if (seedPhrases.containsKey(seedId)) data.reversedArray() else null
     }
 
-    override suspend fun signAlgorandPayment(
+    override suspend fun signTransaction(
         seedId: Long,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray? {
         failure?.let { throw it }
-        return if (seedPhrases.containsKey(seedId)) "$receiver:$amountMicroAlgos".toByteArray() else null
+        return if (seedPhrases.containsKey(seedId)) transaction.reversedArray() else null
     }
 
     override suspend fun getPublicKey(seedId: Long): ByteArray? =

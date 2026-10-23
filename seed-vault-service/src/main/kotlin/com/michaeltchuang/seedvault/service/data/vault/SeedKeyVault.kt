@@ -1,7 +1,5 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
-
 /** Where the secret keys of a seed live. The name is stored in the seed row. */
 internal enum class SeedStorage {
     /** Encrypted with the Android Keystore key and kept in the Room database. */
@@ -44,12 +42,10 @@ internal interface SeedKeyVault {
         data: ByteArray,
     ): ByteArray?
 
-    /** Signs an Algorand payment of [amountMicroAlgos] from the seed's account to [receiver]. */
-    suspend fun signAlgorandPayment(
+    /** Signs an unsigned Algorand [transaction] with the seed's account and returns the signed transaction. */
+    suspend fun signTransaction(
         seed: StoredSeed,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray?
 
     /** Removes the secrets of the seed. */

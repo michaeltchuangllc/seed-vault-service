@@ -1,5 +1,6 @@
 [versions]
 agp = "9.2.1"
+algokit-core = "1.0.0-alpha.85"
 android-compileSdk = "37"
 android-minSdk = "34"
 android-targetSdk = "37"
@@ -28,6 +29,7 @@ seedvaultWalletSdk = "0.4.0"
 sol4k = "0.8.1"
 
 [libraries]
+algokit-composer = { module = "io.github.algorandecosystem:algokit-composer", version.ref = "algokit-core" }
 androidx-activityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-compose-activity" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3" }

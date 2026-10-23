@@ -1,6 +1,5 @@
 package com.michaeltchuang.seedvault.service.domain.repository
 
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import kotlinx.coroutines.flow.Flow
 
@@ -31,14 +30,12 @@ interface SeedVaultRepository {
     ): ByteArray?
 
     /**
-     * Builds an Algorand payment from the seed's account to [receiver] and signs it. Returns null if
-     * the seed no longer exists or [receiver] is not a valid address.
+     * Signs an unsigned Algorand [transaction] with the seed's account and returns the signed transaction.
+     * Returns null if the seed no longer exists or signing fails.
      */
-    suspend fun signAlgorandPayment(
+    suspend fun signTransaction(
         seedId: Long,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray?
 
     /** Returns the Falcon-1024 public key of the seed, or null if the seed no longer exists. */

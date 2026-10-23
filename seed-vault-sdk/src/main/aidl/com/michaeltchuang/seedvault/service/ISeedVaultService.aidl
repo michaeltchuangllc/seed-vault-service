@@ -29,24 +29,24 @@ interface ISeedVaultService {
 
     /**
      * Sign a byte array with the Falcon-1024 private key of a seed.
-     * @param seedId id of a seed returned by getAuthorizedSeeds
+     * @param address address of a seed returned by getAuthorizedSeeds, the account that signs
      * @param data the bytes to sign
      * @return the signature, or null if signing failed
-     * @throws SecurityException if the calling app is not authorized for the seed, or there is no matching user approval
+     * @throws SecurityException if the calling app is not authorized for the address, or there is no matching user approval
      * @throws IllegalArgumentException if the vault refuses the data, e.g. it looks like a transaction
      */
-    byte[] signBytes(long seedId, in byte[] data);
+    byte[] signBytes(String address, in byte[] data);
 
     /**
-     * Build and sign an Algorand payment from a seed's Falcon-1024 account. The vault builds the
-     * transaction itself, with the seed as sender and its own fee, so the caller cannot get anything
-     * else signed.
-     * @param seedId id of a seed returned by getAuthorizedSeeds
-     * @param receiver Algorand address to pay
-     * @param amountMicroAlgos amount in microAlgos, 0 is allowed
-     * @param paramsJson JSON {"genesisId", "genesisHash" (Base64), "firstValid", "lastValid"} from algod
+     * Sign an unsigned Algorand transaction with the Falcon-1024 key of a seed. The user is shown what
+     * the transaction does (type, receiver, amount, fee, and a warning for a rekey or close-out) on the
+     * confirm sign screen, so pass exactly the bytes you started it with.
+     * @param address address of a seed returned by getAuthorizedSeeds, the account that signs. It must
+     * be the sender of the transaction
+     * @param transaction the msgpack encoded unsigned transaction, without the "TX" prefix
      * @return the signed transaction, ready to send to algod, or null if signing failed
-     * @throws SecurityException if the calling app is not authorized for the seed, or there is no matching user approval
+     * @throws SecurityException if the calling app is not authorized for the address, or there is no matching user approval
+     * @throws IllegalArgumentException if the bytes are not a transaction, or its sender is not the address
      */
-    byte[] signAlgorandPayment(long seedId, String receiver, long amountMicroAlgos, String paramsJson);
+    byte[] signTransaction(String address, in byte[] transaction);
 }

@@ -94,24 +94,25 @@ class SeedVaultServiceClient(
     fun getAuthorizedSeeds(): List<SeedVaultSeed> = json.decodeFromString(requireService().authorizedSeeds)
 
     /**
-     * Sign [data] with the Falcon-1024 key of a seed. Throws SecurityException if this app is not
-     * authorized for the seed.
+     * Sign [data] with the Falcon-1024 key of the account at [address]. Throws SecurityException if
+     * this app is not authorized for the address.
      */
     fun signBytes(
-        seedId: Long,
+        address: String,
         data: ByteArray,
-    ): ByteArray? = requireService().signBytes(seedId, data)
+    ): ByteArray? = requireService().signBytes(address, data)
 
     /**
-     * Ask the vault to build and sign an Algorand payment from a seed's account. [paramsJson] is the
-     * network values from algod. Throws SecurityException if this app is not authorized for the seed.
+     * Sign an unsigned Algorand [transaction] (msgpack, as built by [AlgorandTransactions] or any other
+     * builder) with the account at [address], which must be its sender. Returns the signed transaction,
+     * ready to send to algod. Throws SecurityException if this app is not authorized for the address or
+     * the user has not approved this transaction, IllegalArgumentException if the bytes are not a
+     * transaction from [address].
      */
-    fun signAlgorandPayment(
-        seedId: Long,
-        receiver: String,
-        amountMicroAlgos: Long,
-        paramsJson: String,
-    ): ByteArray? = requireService().signAlgorandPayment(seedId, receiver, amountMicroAlgos, paramsJson)
+    fun signTransaction(
+        address: String,
+        transaction: ByteArray,
+    ): ByteArray? = requireService().signTransaction(address, transaction)
 
     /** Intent for the authorization screen. Start it with startActivityForResult. */
     fun authorizeAppIntent(): Intent =
@@ -124,26 +125,23 @@ class SeedVaultServiceClient(
      * with startActivityForResult and call [signBytes] with the same values after RESULT_OK.
      */
     fun confirmSignBytesIntent(
-        seedId: Long,
+        address: String,
         data: ByteArray,
-    ): Intent = confirmSignIntent(seedId).putExtra(SeedVaultServiceConstants.EXTRA_DATA, data)
+    ): Intent = confirmSignIntent(address).putExtra(SeedVaultServiceConstants.EXTRA_DATA, data)
 
-    /** Same for [signAlgorandPayment]: pass the same values to it after RESULT_OK. */
-    fun confirmSignPaymentIntent(
-        seedId: Long,
-        receiver: String,
-        amountMicroAlgos: Long,
-        paramsJson: String,
-    ): Intent =
-        confirmSignIntent(seedId)
-            .putExtra(SeedVaultServiceConstants.EXTRA_RECEIVER, receiver)
-            .putExtra(SeedVaultServiceConstants.EXTRA_AMOUNT_MICRO_ALGOS, amountMicroAlgos)
-            .putExtra(SeedVaultServiceConstants.EXTRA_PARAMS_JSON, paramsJson)
+    /**
+     * Same for [signTransaction]: the user is shown what the transaction does. Pass the same
+     * [transaction] to [signTransaction] after RESULT_OK.
+     */
+    fun confirmSignTransactionIntent(
+        address: String,
+        transaction: ByteArray,
+    ): Intent = confirmSignIntent(address).putExtra(SeedVaultServiceConstants.EXTRA_TRANSACTION, transaction)
 
-    private fun confirmSignIntent(seedId: Long): Intent =
+    private fun confirmSignIntent(address: String): Intent =
         Intent(SeedVaultServiceConstants.ACTION_CONFIRM_SIGN)
             .setPackage(SeedVaultServiceConstants.PACKAGE)
-            .putExtra(SeedVaultServiceConstants.EXTRA_SEED_ID, seedId)
+            .putExtra(SeedVaultServiceConstants.EXTRA_ADDRESS, address)
 
     private companion object {
         const val TAG = "SeedVaultServiceClient"

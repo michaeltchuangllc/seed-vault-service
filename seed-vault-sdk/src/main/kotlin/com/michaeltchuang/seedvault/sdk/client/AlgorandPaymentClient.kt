@@ -6,50 +6,42 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Immutable payment values reused for both user approval and signing. */
+/** An unsigned payment, reused for both user approval and signing. */
 class PreparedAlgorandPayment internal constructor(
-    internal val seedId: Long,
-    internal val receiver: String,
-    internal val amountMicroAlgos: Long,
-    internal val paramsJson: String,
+    internal val senderAddress: String,
+    val receiverAddress: String,
+    val amountMicroAlgos: Long,
+    internal val transaction: ByteArray,
     private val client: SeedVaultServiceClient,
 ) {
     val confirmationIntent: Intent
-        get() = client.confirmSignPaymentIntent(seedId, receiver, amountMicroAlgos, paramsJson)
+        get() = client.confirmSignTransactionIntent(senderAddress, transaction)
 }
 
-/** Builds payment requests and submits them after the host receives successful user approval. */
+/** Builds payments and submits them after the host receives successful user approval. */
 class AlgorandPaymentClient(
     private val vault: SeedVaultServiceClient,
     private val repository: AlgorandRepository,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun preparePayment(
-        seedId: Long,
-        receiver: String,
+        senderAddress: String,
+        receiverAddress: String,
         amountMicroAlgos: Long,
     ): PreparedAlgorandPayment {
-        require(receiver.isNotBlank()) { "Receiver is required" }
+        require(senderAddress.isNotBlank()) { "Sender address is required" }
+        require(receiverAddress.isNotBlank()) { "Receiver address is required" }
         require(amountMicroAlgos >= 0) { "Amount cannot be negative" }
-        return PreparedAlgorandPayment(
-            seedId,
-            receiver,
-            amountMicroAlgos,
-            repository.getPaymentParamsJson(),
-            vault,
-        )
+        val transaction =
+            AlgorandTransactions.payment(senderAddress, receiverAddress, amountMicroAlgos, repository.getPaymentParams())
+        return PreparedAlgorandPayment(senderAddress, receiverAddress, amountMicroAlgos, transaction, vault)
     }
 
-    /** Call only after RESULT_OK. The service enforces exact, one-time approval of these values. */
+    /** Call only after RESULT_OK. The service enforces exact, one-time approval of this transaction. */
     suspend fun signAndSend(payment: PreparedAlgorandPayment): String {
         val signed =
             withContext(ioDispatcher) {
-                vault.signAlgorandPayment(
-                    payment.seedId,
-                    payment.receiver,
-                    payment.amountMicroAlgos,
-                    payment.paramsJson,
-                )
+                vault.signTransaction(payment.senderAddress, payment.transaction)
             } ?: error("Seed Vault Service could not sign the payment")
         return repository.sendSignedTransaction(signed)
     }

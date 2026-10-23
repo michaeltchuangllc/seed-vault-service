@@ -22,7 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.michaeltchuang.seedvault.service.R
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
-import com.michaeltchuang.seedvault.service.domain.usecase.GetSeed
+import com.michaeltchuang.seedvault.service.domain.usecase.GetSeeds
 import com.michaeltchuang.seedvault.service.remote.SignApprovalCoordinator
 import com.michaeltchuang.seedvault.service.remote.SignApprovalRequest
 import com.michaeltchuang.seedvault.service.ui.auth.rememberRequireAuth
@@ -61,9 +61,9 @@ fun ConfirmSignScreen(
         onDispose { coordinator.resolve(requestId, false) }
     }
     // Only a seed the app is authorized for can be signed with, anything else is a no
-    val getSeed: GetSeed = koinInject()
+    val getSeeds: GetSeeds = koinInject()
     val seed by produceState<SeedLookup>(SeedLookup.Loading, request) {
-        val found = getSeed(request.operation.seedId).first()
+        val found = getSeeds().first().firstOrNull { it.address == request.operation.address }
         value = SeedLookup.Done(found?.takeIf { seed -> seed.authorizedApps.any { it.packageName == request.callerPackage } })
     }
     val lookup = seed

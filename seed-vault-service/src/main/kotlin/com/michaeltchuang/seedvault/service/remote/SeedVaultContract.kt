@@ -1,7 +1,5 @@
 package com.michaeltchuang.seedvault.service.remote
 
-import android.util.Base64
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import kotlinx.serialization.Serializable
 
 /** Names client apps use to reach the Seed Vault Service. */
@@ -20,32 +18,13 @@ object SeedVaultContract {
     /**
      * Action of the activity where the user approves a signature and verifies themselves. Start it
      * with startActivityForResult with the values you are about to pass to the sign method, then
-     * call that method after RESULT_OK. Extras: [EXTRA_SEED_ID] and either [EXTRA_DATA] (signBytes)
-     * or [EXTRA_RECEIVER], [EXTRA_AMOUNT_MICRO_ALGOS] and [EXTRA_PARAMS_JSON] (signAlgorandPayment).
+     * call that method after RESULT_OK. Extras: [EXTRA_ADDRESS] (the signing account) and either [EXTRA_DATA] (signBytes)
+     * or [EXTRA_TRANSACTION] (signTransaction).
      */
     const val ACTION_CONFIRM_SIGN = "$PACKAGE.CONFIRM_SIGN"
-    const val EXTRA_SEED_ID = "seed_id"
+    const val EXTRA_ADDRESS = "address"
     const val EXTRA_DATA = "data"
-    const val EXTRA_RECEIVER = "receiver"
-    const val EXTRA_AMOUNT_MICRO_ALGOS = "amount_micro_algos"
-    const val EXTRA_PARAMS_JSON = "params_json"
-}
-
-/** Algod values for `signAlgorandPayment`. [genesisHash] is Base64 encoded. */
-@Serializable
-data class RemoteAlgorandParams(
-    val genesisId: String,
-    val genesisHash: String,
-    val firstValid: Long,
-    val lastValid: Long,
-) {
-    internal fun toPaymentParams() =
-        AlgorandPaymentParams(
-            genesisId = genesisId,
-            genesisHash = Base64.decode(genesisHash, Base64.DEFAULT),
-            firstValid = firstValid,
-            lastValid = lastValid,
-        )
+    const val EXTRA_TRANSACTION = "transaction"
 }
 
 /** A seed as returned by `getAuthorizedSeeds`. [publicKey] is Base64 encoded. */
