@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [SeedEntity::class, AuthorizedAppEntity::class],
+    entities = [SeedEntity::class, SeedAccountEntity::class, AuthorizedAppEntity::class],
     version = 1,
 )
 internal abstract class SeedVaultDatabase : RoomDatabase() {
@@ -15,6 +15,9 @@ internal abstract class SeedVaultDatabase : RoomDatabase() {
     companion object {
         private const val DATABASE_NAME = "seed_vault.db"
 
-        fun build(context: Context): SeedVaultDatabase = Room.databaseBuilder(context, SeedVaultDatabase::class.java, DATABASE_NAME).build()
+        fun build(context: Context): SeedVaultDatabase =
+            Room
+                .databaseBuilder(context, SeedVaultDatabase::class.java, DATABASE_NAME)
+                .build()
     }
 }

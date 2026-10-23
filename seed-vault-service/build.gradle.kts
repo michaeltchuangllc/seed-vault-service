@@ -118,9 +118,13 @@ dependencies {
     // META-INF/*.kotlin_module. A local aar carries no transitive dependencies, so its runtime ones are declared here.
     implementation(files("libs/wallet_sdk_core.aar"))
     implementation("io.github.aakira:napier-android:2.7.1")
-    implementation("io.github.algorandecosystem:algokit-composer:1.0.0-alpha.85")
-    implementation("io.github.algorandecosystem:algokit-crypto:1.0.0-alpha.85")
-    implementation("io.github.algorandecosystem:algokit-transact:1.0.0-alpha.85")
+    // algokit-core Rust FFI, built locally: algokit-crypto has the Falcon-1024 derivation (salted addresses) and
+    // algokit-transact the pqsig signed transaction, which the Maven alpha.85 builds lack. They replace the Maven
+    // coordinates wallet-sdk-core was built against, so no other copy of these libraries may be on the classpath.
+    implementation(files("libs/algokit_composer.aar"))
+    implementation(files("libs/algokit_crypto.aar"))
+    implementation(files("libs/algokit_transact.aar"))
+    // Only used by the parts of wallet-sdk-core the vault does not call (the vault uses the Rust FFI above)
     implementation("io.github.algorandecosystem:falcon-signatures-mobile-sdk:0.0.19")
     implementation("cash.z.ecc.android:kotlin-bip39-jvm:1.0.9")
     implementation("org.bouncycastle:bcprov-jdk18on:1.84")

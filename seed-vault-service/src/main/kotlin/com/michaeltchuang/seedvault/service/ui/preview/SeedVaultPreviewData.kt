@@ -1,6 +1,9 @@
 package com.michaeltchuang.seedvault.service.ui.preview
 
+import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.AuthorizedApp
+import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.model.VaultAddress
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import com.michaeltchuang.walletsdk.core.foundation.utils.WalletSdkConstants
 
@@ -39,6 +42,11 @@ object SeedVaultPreviewData {
                 name = "Demo Seed 2",
                 isBackedUp = false,
                 authorizedApps = listOf(walletDemoApp, walletServiceDemoApp, systemWalletApp),
+                addresses =
+                    listOf(
+                        VaultAddress(HUMAN_SIGN_ADDRESS_INDEX, "PQHUMANSIGNADDRESSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+                        VaultAddress(AUTOSIGN_ADDRESS_INDEX, "PQAUTOSIGNADDRESSBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
+                    ),
             ),
         )
 }

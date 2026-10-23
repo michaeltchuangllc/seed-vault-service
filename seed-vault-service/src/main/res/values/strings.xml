@@ -99,4 +99,9 @@
     <string name="security_test_title">Test verification</string>
     <string name="security_test_ok">Verified</string>
     <string name="security_open_settings">Open device security settings</string>
+    <string name="security_autosign">Allow autosign</string>
+    <string name="security_autosign_description">Every seed has a second, autosign address. When this is on, apps you authorized for a seed can sign with its autosign address without asking you. The main address always asks.</string>
+    <string name="security_autosign_auth_title">Allow autosign</string>
+    <string name="seed_address">Address</string>
+    <string name="seed_autosign_address">Autosign address</string>
 </resources>

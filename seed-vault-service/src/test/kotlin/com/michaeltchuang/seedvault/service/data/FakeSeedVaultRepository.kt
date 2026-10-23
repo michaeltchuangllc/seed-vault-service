@@ -50,23 +50,25 @@ class FakeSeedVaultRepository(
     }
 
     override suspend fun signBytes(
-        seedId: Long,
+        address: String,
         data: ByteArray,
     ): ByteArray? {
         failure?.let { throw it }
-        return if (seedPhrases.containsKey(seedId)) data.reversedArray() else null
+        return if (hasAddress(address)) data.reversedArray() else null
     }
 
     override suspend fun signTransaction(
-        seedId: Long,
+        address: String,
         transaction: ByteArray,
     ): ByteArray? {
         failure?.let { throw it }
-        return if (seedPhrases.containsKey(seedId)) transaction.reversedArray() else null
+        return if (hasAddress(address)) transaction.reversedArray() else null
     }
 
-    override suspend fun getPublicKey(seedId: Long): ByteArray? =
-        if (seedPhrases.containsKey(seedId)) byteArrayOf(seedId.toByte()) else null
+    private fun hasAddress(address: String) = seeds.any { it.indexOf(address) != null }
+
+    override suspend fun getPublicKey(address: String): ByteArray? =
+        seeds.firstOrNull { it.indexOf(address) != null }?.let { byteArrayOf(it.id.toByte()) }
 
     override suspend fun authorizeApp(
         seedId: Long,

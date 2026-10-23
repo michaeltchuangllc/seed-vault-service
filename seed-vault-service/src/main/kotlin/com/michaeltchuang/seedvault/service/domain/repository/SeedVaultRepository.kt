@@ -12,6 +12,7 @@ interface SeedVaultRepository {
 
     fun getSeed(seedId: Long): Flow<VaultSeed?>
 
+    /** Stores the seed phrase with an address for every index of [com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES]. */
     suspend fun addSeed(
         seedPhrase: List<String>,
         isBackedUp: Boolean,
@@ -21,25 +22,25 @@ interface SeedVaultRepository {
     suspend fun getSeedPhrase(seedId: Long): List<String>?
 
     /**
-     * Signs [data] with the Falcon-1024 private key of the seed. Returns null if the seed no longer
-     * exists or signing fails.
+     * Signs [data] with the Falcon-1024 key behind [address], one of a seed's accounts. Returns
+     * null if no seed has that address or signing fails.
      */
     suspend fun signBytes(
-        seedId: Long,
+        address: String,
         data: ByteArray,
     ): ByteArray?
 
     /**
-     * Signs an unsigned Algorand [transaction] with the seed's account and returns the signed transaction.
-     * Returns null if the seed no longer exists or signing fails.
+     * Signs an unsigned Algorand [transaction] as [address], one of a seed's accounts, and returns
+     * the signed transaction. Returns null if no seed has that address or signing fails.
      */
     suspend fun signTransaction(
-        seedId: Long,
+        address: String,
         transaction: ByteArray,
     ): ByteArray?
 
-    /** Returns the Falcon-1024 public key of the seed, or null if the seed no longer exists. */
-    suspend fun getPublicKey(seedId: Long): ByteArray?
+    /** Returns the Falcon-1024 public key of the account with [address], or null if no seed has it. */
+    suspend fun getPublicKey(address: String): ByteArray?
 
     /** Lets the app with [packageName] request signatures from the seed. */
     suspend fun authorizeApp(

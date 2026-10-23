@@ -32,10 +32,10 @@ fun interface GetSeedPhrase {
     suspend operator fun invoke(seedId: Long): List<String>?
 }
 
-/** Signs a byte array with the Falcon-1024 key of a seed. */
+/** Signs a byte array with the Falcon-1024 key behind one of a seed's accounts. */
 fun interface SignBytes {
     suspend operator fun invoke(
-        seedId: Long,
+        address: String,
         data: ByteArray,
     ): ByteArray?
 }
