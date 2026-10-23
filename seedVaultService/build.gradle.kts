@@ -1,8 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.gradle.play.publisher)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.ktlint)
@@ -26,8 +28,36 @@ android {
             libs.versions.android.targetSdk
                 .get()
                 .toInt()
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0) +
+            libs.versions.android.versionCode.offset
+                .get()
+                .toInt()
+        versionName = System.getenv("VERSION_TAG") ?: "0.0.1"
+    }
+
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { stream -> localProperties.load(stream) }
+    }
+
+    val keystoreFile = rootProject.file("keystore.jks").takeIf { it.exists() }
+
+    signingConfigs {
+        create("release") {
+            storeFile = keystoreFile
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: localProperties.getProperty("keystore.password")
+            keyAlias = System.getenv("KEY_ALIAS") ?: localProperties.getProperty("key.alias")
+            keyPassword = System.getenv("KEY_PASSWORD") ?: localProperties.getProperty("key.password")
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     buildFeatures {
@@ -58,6 +88,8 @@ android {
                     "META-INF/notice.txt",
                     "META-INF/ASL2.0",
                     "META-INF/*.kotlin_module",
+                    // Desktop-only native libs shipped as resources, rejected by bundletool
+                    "lib/libnarcissus-*",
                 )
             pickFirsts += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
@@ -72,6 +104,12 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
+}
+
+play {
+    serviceAccountCredentials.set(rootProject.file("service-account.json"))
+    track.set("internal")
+    defaultToAppBundles.set(true)
 }
 
 dependencies {

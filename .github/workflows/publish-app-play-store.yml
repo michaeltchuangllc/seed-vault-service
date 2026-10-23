@@ -1,0 +1,53 @@
+# This workflow will build the Seed Vault Service app and publish it to the Play Store
+
+name: Publish Seed Vault Service To Play Store
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*.*.*' ]
+
+jobs:
+
+  publish-to-play-store:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
+
+      - name: Decode Service Account JSON
+        run: |
+          echo "${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+
+      - name: Build and Publish to Play Store Internal Track
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_TAG: ${{ github.ref_name }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # versionName comes from the tag (leading 'v' removed), falling back to the default for manual runs
+          if [[ "$GITHUB_TAG" == v* ]]; then export VERSION_TAG=${GITHUB_TAG#v}; fi
+          echo "Building and publishing Seed Vault Service to Play Store internal track (run $GITHUB_RUN_NUMBER)..."
+          ./gradlew :seedVaultService:bundleRelease
+          ./gradlew :seedVaultService:publishReleaseBundle --track internal
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f keystore.jks
+          rm -f service-account.json

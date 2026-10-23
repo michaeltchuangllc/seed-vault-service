@@ -1,0 +1,77 @@
+name: "Android Build And Tests"
+
+on:
+  # no timezone support so cron runs in UTC time for now
+  schedule:
+    - cron: "8 15 * * *"
+
+  # Allow workflow to be manually run from the GitHub UI
+  workflow_dispatch:
+
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  unit-tests:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+      - name: "Install JDK 21"
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+          cache: "gradle"
+      - name: "Run Unit Tests"
+        run: ./gradlew testDebugUnitTest
+      - name: "Archive Unit Tests Report"
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: "unit-tests-results"
+          path: ./**/build/reports/**
+          overwrite: true
+
+  lint:
+    name: "ktlint And Android Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+      - name: "Install JDK 21"
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+          cache: "gradle"
+      - name: "Run ktlint And Lint"
+        run: ./gradlew ktlintCheck lintDebug
+      - name: "Archive Lint Results"
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: "lint-results"
+          path: ./**/build/reports/**
+          overwrite: true
+
+  build:
+    name: "Build Seed Vault Service, SDK And Demo App"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+      - name: "Install JDK 21"
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+          cache: "gradle"
+      - name: "Assemble Debug"
+        run: ./gradlew :seedVaultService:assembleDebug :seedVaultSDK:assembleDebug :serviceDemoApp:assembleDebug
