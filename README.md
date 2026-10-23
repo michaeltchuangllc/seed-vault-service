@@ -35,14 +35,3 @@ Once a core release that includes the `kotlin_module` fix is on Maven Central, r
 
 Install `seed-vault-service` before `seed-vault-demo-app` so the permission exists when the client is installed. After a package rename or a Room schema change, uninstall the app first.
 
-## CI and releases
-
-Workflows in `.github/workflows/`:
-
-- **`android-build.yml`**: on every push and PR (and nightly), runs `testDebugUnitTest`, `ktlintCheck` + `lintDebug`, and `assembleDebug` for `seed-vault-service`, `seed-vault-sdk` and `seed-vault-demo-app`.
-- **`publish-sdk-maven.yml`**: on a `vX.Y.Z` tag, publishes `seed-vault-sdk` to Maven Central as `com.michaeltchuang.algokit.seedvault:seed-vault-sdk:X.Y.Z` (staged, release it manually in the Central portal).
-- **`publish-app-play-store.yml`**: on a `vX.Y.Z` tag or manual run, builds the signed `seed-vault-service` bundle and uploads it to the Play Store internal track. `versionName` is the tag, `versionCode` is the run number plus an offset.
-
-Repository secrets: `RSA_GPG_PRIVATE_KEY`, `RSA_GPG_PASSPHRASE`, `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` (Maven Central) and `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_STORE_SERVICE_ACCOUNT_JSON` (Play Store). For local release builds put `keystore.jks` in the repo root and `keystore.password`, `key.alias`, `key.password` in `local.properties`.
-
-Both publish workflows fire on the same tag. The first Play Store upload of `com.michaeltchuang.seedvault.service` needs the app to exist in the Play Console first.
