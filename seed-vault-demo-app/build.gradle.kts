@@ -54,7 +54,9 @@ android {
 }
 
 dependencies {
+    // Swap these two lines to build against the SDK published on Maven Central instead of this repo's module
     implementation(project(":seed-vault-sdk"))
+    // implementation(libs.seed.vault.sdk)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
