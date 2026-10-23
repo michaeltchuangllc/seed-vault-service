@@ -23,7 +23,6 @@ navigation-compose = "2.9.2"
 room = "2.8.4"
 seedvaultWalletSdk = "0.4.0"
 sol4k = "0.8.1"
-walletSdkCore = "3.202604.0"
 
 [libraries]
 androidx-activityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-compose-activity" }
@@ -57,7 +56,6 @@ room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 seedvault-wallet-sdk = { module = "com.solanamobile:seedvault-wallet-sdk", version.ref = "seedvaultWalletSdk" }
 sol4k = { module = "org.sol4k:sol4k", version.ref = "sol4k" }
-wallet-sdk-core = { module = "com.michaeltchuang.algokit.walletsdk:wallet-sdk-core", version.ref = "walletSdkCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

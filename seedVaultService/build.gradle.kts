@@ -76,7 +76,31 @@ kotlin {
 
 dependencies {
     // Falcon-1024 seed phrases and Android Keystore encryption
-    implementation(libs.wallet.sdk.core)
+    // wallet-sdk-core, built from algokit-walletsdk-kmp. Replace with the Maven coordinate once a release includes
+    // META-INF/*.kotlin_module. A local aar carries no transitive dependencies, so its runtime ones are declared here.
+    implementation(files("libs/wallet_sdk_core.aar"))
+    implementation("io.github.aakira:napier-android:2.7.1")
+    implementation("io.github.algorandecosystem:algokit-composer:1.0.0-alpha.85")
+    implementation("io.github.algorandecosystem:algokit-crypto:1.0.0-alpha.85")
+    implementation("io.github.algorandecosystem:algokit-transact:1.0.0-alpha.85")
+    implementation("io.github.algorandecosystem:falcon-signatures-mobile-sdk:0.0.19")
+    implementation("cash.z.ecc.android:kotlin-bip39-jvm:1.0.9")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.84")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.11.0")
+    implementation("javax.inject:javax.inject:1")
+    implementation("com.appmattus.fixture:fixture:1.2.0")
+    implementation("com.michaeltchuang.algokit:algorand-foundation-crypto:0.1.0")
+    implementation("com.michaeltchuang.algokit:algorand-foundation-provider:0.1.0")
+    implementation("app.perawallet:dP256:1.0.2")
+    implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")
+    implementation("org.msgpack:jackson-dataformat-msgpack:0.9.12")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.22.1")
+    implementation("net.pwall.json:json-kotlin-schema:0.48")
+    implementation("io.github.erdtman:java-json-canonicalization:1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.8.0")
+    implementation("com.ionspin.kotlin:bignum-jvm:0.3.10")
+    implementation(libs.kotlinx.coroutines.android)
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.compose.viewmodel)
