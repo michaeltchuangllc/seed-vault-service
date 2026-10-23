@@ -1,6 +1,5 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import com.michaeltchuang.walletsdk.core.algosdk.recoverFalcon25Account
 import uniffi.seed_vault_ffi.AppletErrorCode
 import uniffi.seed_vault_ffi.KeyAlgorithm
@@ -75,13 +74,10 @@ internal class TrustySeedKeyVault(
         }
     }
 
-    override suspend fun signAlgorandPayment(
+    override suspend fun signTransaction(
         seed: StoredSeed,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray? {
-        val transaction = buildFalconPayment(seed.address, receiver, amountMicroAlgos, params) ?: return null
         val listed = listAccount(seed.address)
         return client.signTransaction(listed.account.address, listed.account.addressIndex.toUByte(), transaction).signedTxn
     }

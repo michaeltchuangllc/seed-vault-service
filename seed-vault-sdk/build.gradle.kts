@@ -35,6 +35,11 @@ android {
 }
 
 dependencies {
+    // algokit-composer pulls JNA 5.14.0, whose x86_64 libjnidispatch.so is not 16 KB aligned.
+    implementation(libs.algokit.composer) {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
     implementation(libs.seedvault.wallet.sdk)
     implementation(libs.sol4k)
     implementation(libs.ktor.client.core)

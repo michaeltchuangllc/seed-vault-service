@@ -1,6 +1,8 @@
 package com.michaeltchuang.seedvault.sdk.data.repository
 
+import android.util.Base64
 import android.util.Log
+import com.michaeltchuang.seedvault.sdk.domain.model.AlgorandPaymentParams
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
@@ -15,10 +17,8 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 /**
  * Reads balances from and sends transactions to an Algorand node (algod) over REST, the same
@@ -50,11 +50,8 @@ class AlgorandRepository(
                 .toLong()
         }
 
-    /**
-     * Network values for a payment as the JSON `signAlgorandPayment` takes:
-     * {"genesisId", "genesisHash", "firstValid", "lastValid"}.
-     */
-    suspend fun getPaymentParamsJson(): String =
+    /** Network values (genesis, valid round range) for building a transaction. */
+    suspend fun getPaymentParams(): AlgorandPaymentParams =
         withContext(Dispatchers.IO) {
             val response: HttpResponse = httpClient.get("$nodeBaseUrl/v2/transactions/params")
             check(response.status.isSuccess()) { "Params request failed: ${response.status.value} ${response.bodyAsText()}" }
@@ -64,12 +61,12 @@ class AlgorandRepository(
                     .getValue("last-round")
                     .jsonPrimitive.content
                     .toLong()
-            buildJsonObject {
-                put("genesisId", params.getValue("genesis-id").jsonPrimitive.content)
-                put("genesisHash", params.getValue("genesis-hash").jsonPrimitive.content)
-                put("firstValid", lastRound)
-                put("lastValid", lastRound + VALID_ROUNDS)
-            }.toString()
+            AlgorandPaymentParams(
+                genesisId = params.getValue("genesis-id").jsonPrimitive.content,
+                genesisHash = Base64.decode(params.getValue("genesis-hash").jsonPrimitive.content, Base64.DEFAULT),
+                firstValid = lastRound,
+                lastValid = lastRound + VALID_ROUNDS,
+            )
         }
 
     /** Sends a signed transaction and returns its transaction id. */

@@ -84,6 +84,11 @@
     <string name="confirm_sign_seed">Seed: %1$s</string>
     <string name="confirm_sign_bytes">Sign %1$d bytes of data</string>
     <string name="confirm_sign_payment">Send %1$s ALGO to %2$s</string>
+    <string name="confirm_sign_asset_transfer">Send %1$d of asset %2$d to %3$s</string>
+    <string name="confirm_sign_transaction">Sign a %1$s transaction</string>
+    <string name="confirm_sign_fee">Fee: %1$s ALGO</string>
+    <string name="confirm_sign_close_to">Warning: sends the rest of the balance to %1$s</string>
+    <string name="confirm_sign_rekey_to">Warning: gives control of the account to %1$s</string>
     <string name="confirm_sign_approve">Verify and sign</string>
     <string name="confirm_sign_deny">Deny</string>
     <string name="security_title">Security and fingerprint</string>

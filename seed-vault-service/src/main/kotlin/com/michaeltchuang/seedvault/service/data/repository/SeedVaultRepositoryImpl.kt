@@ -8,7 +8,6 @@ import com.michaeltchuang.seedvault.service.data.database.SeedWithApps
 import com.michaeltchuang.seedvault.service.data.vault.SeedKeyVault
 import com.michaeltchuang.seedvault.service.data.vault.SeedStorage
 import com.michaeltchuang.seedvault.service.data.vault.StoredSeed
-import com.michaeltchuang.seedvault.service.domain.model.AlgorandPaymentParams
 import com.michaeltchuang.seedvault.service.domain.model.AuthorizedApp
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
@@ -71,15 +70,13 @@ internal class SeedVaultRepositoryImpl(
             vaultFor(seed).signBytes(seed.toStoredSeed(), data)
         }
 
-    override suspend fun signAlgorandPayment(
+    override suspend fun signTransaction(
         seedId: Long,
-        receiver: String,
-        amountMicroAlgos: Long,
-        params: AlgorandPaymentParams,
+        transaction: ByteArray,
     ): ByteArray? =
         withContext(coroutineDispatcher) {
             val seed = seedDao.getSeed(seedId) ?: return@withContext null
-            vaultFor(seed).signAlgorandPayment(seed.toStoredSeed(), receiver, amountMicroAlgos, params)
+            vaultFor(seed).signTransaction(seed.toStoredSeed(), transaction)
         }
 
     override suspend fun getSeedPhrase(seedId: Long): List<String>? =

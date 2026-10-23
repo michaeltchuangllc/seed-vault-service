@@ -10,7 +10,7 @@ import org.junit.Test
 class SignApprovalCoordinatorTest {
     private var now = 0L
     private val coordinator = SignApprovalCoordinator(clock = { now }, grantMillis = 1_000)
-    private val operation = SignOperation.bytes(seedId = 1, data = byteArrayOf(1, 2, 3))
+    private val operation = SignOperation.bytes(address = "ADDRESS", data = byteArrayOf(1, 2, 3))
 
     private fun begin(
         caller: String = "client",
@@ -48,8 +48,8 @@ class SignApprovalCoordinatorTest {
     fun approvalIsForTheExactOperation() {
         coordinator.resolve(begin(), approved = true)
 
-        assertFalse(coordinator.consume(setOf("client"), SignOperation.bytes(1, byteArrayOf(1, 2, 4))))
-        assertFalse(coordinator.consume(setOf("client"), SignOperation.bytes(2, byteArrayOf(1, 2, 3))))
+        assertFalse(coordinator.consume(setOf("client"), SignOperation.bytes("ADDRESS", byteArrayOf(1, 2, 4))))
+        assertFalse(coordinator.consume(setOf("client"), SignOperation.bytes("OTHER_ADDRESS", byteArrayOf(1, 2, 3))))
     }
 
     @Test
@@ -61,13 +61,13 @@ class SignApprovalCoordinatorTest {
     }
 
     @Test
-    fun paymentValuesAllMatter() {
-        val payment = SignOperation.payment(1, "RECEIVER", 5, "{}")
+    fun transactionBytesAndSignerBothMatter() {
+        val transaction = SignOperation.transaction("ADDRESS", byteArrayOf(1, 2, 3))
 
-        assertEquals(payment, SignOperation.payment(1, "RECEIVER", 5, "{}"))
-        assertNotEquals(payment, SignOperation.payment(1, "OTHER", 5, "{}"))
-        assertNotEquals(payment, SignOperation.payment(1, "RECEIVER", 6, "{}"))
-        assertNotEquals(payment, SignOperation.payment(1, "RECEIVER", 5, "{\"a\":1}"))
+        assertEquals(transaction, SignOperation.transaction("ADDRESS", byteArrayOf(1, 2, 3)))
+        assertNotEquals(transaction, SignOperation.transaction("ADDRESS", byteArrayOf(1, 2, 4)))
+        assertNotEquals(transaction, SignOperation.transaction("OTHER_ADDRESS", byteArrayOf(1, 2, 3)))
+        assertNotEquals(transaction, SignOperation.bytes("ADDRESS", byteArrayOf(1, 2, 3)))
     }
 
     @Test

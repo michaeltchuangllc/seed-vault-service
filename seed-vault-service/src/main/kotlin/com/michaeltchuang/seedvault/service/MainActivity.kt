@@ -13,10 +13,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.fragment.app.FragmentActivity
+import com.michaeltchuang.seedvault.service.remote.DecodedTransaction
 import com.michaeltchuang.seedvault.service.remote.SeedVaultContract
 import com.michaeltchuang.seedvault.service.remote.SignApprovalCoordinator
 import com.michaeltchuang.seedvault.service.remote.SignApprovalRequest
 import com.michaeltchuang.seedvault.service.remote.SignOperation
+import com.michaeltchuang.seedvault.service.remote.TransactionDecoder
 import com.michaeltchuang.seedvault.service.ui.navigation.AuthorizeApp
 import com.michaeltchuang.seedvault.service.ui.navigation.ConfirmSign
 import com.michaeltchuang.seedvault.service.ui.navigation.SeedVaultNavHost
@@ -37,6 +39,7 @@ import android.graphics.Color as AndroidColor
  */
 class MainActivity : FragmentActivity() {
     private val signApprovals: SignApprovalCoordinator by inject()
+    private val transactionDecoder: TransactionDecoder by inject()
     private var confirmRequestId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,21 +97,18 @@ class MainActivity : FragmentActivity() {
      */
     private fun confirmSignDestination(): Any? {
         val callerPackage = callingActivity?.packageName ?: return null
-        val seedId = intent.getLongExtra(SeedVaultContract.EXTRA_SEED_ID, NO_SEED_ID)
-        if (seedId == NO_SEED_ID) return null
-        val receiver = intent.getStringExtra(SeedVaultContract.EXTRA_RECEIVER)
+        val address = intent.getStringExtra(SeedVaultContract.EXTRA_ADDRESS)?.takeIf { it.isNotBlank() } ?: return null
+        val transaction = intent.getByteArrayExtra(SeedVaultContract.EXTRA_TRANSACTION)
         val operation: SignOperation
         val description: String
-        if (receiver != null) {
-            val amount = intent.getLongExtra(SeedVaultContract.EXTRA_AMOUNT_MICRO_ALGOS, NO_AMOUNT)
-            val paramsJson = intent.getStringExtra(SeedVaultContract.EXTRA_PARAMS_JSON)
-            if (amount == NO_AMOUNT || paramsJson == null) return null
-            operation = SignOperation.payment(seedId, receiver, amount, paramsJson)
-            val algos = BigDecimal(amount).movePointLeft(MICRO_ALGO_DECIMALS).toPlainString()
-            description = getString(R.string.confirm_sign_payment, algos, receiver)
+        if (transaction != null) {
+            // Show what the transaction does, and refuse one the vault would not sign anyway
+            val decoded = transactionDecoder.decode(transaction)?.takeIf { it.sender == address } ?: return null
+            operation = SignOperation.transaction(address, transaction)
+            description = describe(decoded)
         } else {
             val data = intent.getByteArrayExtra(SeedVaultContract.EXTRA_DATA) ?: return null
-            operation = SignOperation.bytes(seedId, data)
+            operation = SignOperation.bytes(address, data)
             description = getString(R.string.confirm_sign_bytes, data.size)
         }
         val requestId =
@@ -117,6 +117,32 @@ class MainActivity : FragmentActivity() {
             )
         confirmRequestId = requestId
         return ConfirmSign(requestId)
+    }
+
+    private fun describe(transaction: DecodedTransaction): String {
+        val lines = mutableListOf<String>()
+        lines +=
+            when {
+                transaction.isAlgoPayment ->
+                    getString(
+                        R.string.confirm_sign_payment,
+                        BigDecimal(transaction.amount ?: 0L).movePointLeft(MICRO_ALGO_DECIMALS).toPlainString(),
+                        transaction.receiver.orEmpty(),
+                    )
+                transaction.assetId != null ->
+                    getString(
+                        R.string.confirm_sign_asset_transfer,
+                        transaction.amount ?: 0L,
+                        transaction.assetId,
+                        transaction.receiver.orEmpty(),
+                    )
+                else -> getString(R.string.confirm_sign_transaction, transaction.type)
+            }
+        lines +=
+            getString(R.string.confirm_sign_fee, BigDecimal(transaction.feeMicroAlgos).movePointLeft(MICRO_ALGO_DECIMALS).toPlainString())
+        transaction.closeRemainderTo?.let { lines += getString(R.string.confirm_sign_close_to, it) }
+        transaction.rekeyTo?.let { lines += getString(R.string.confirm_sign_rekey_to, it) }
+        return lines.joinToString("\n")
     }
 
     private fun finishFlow(approved: Boolean) {
@@ -132,8 +158,6 @@ class MainActivity : FragmentActivity() {
         }
 
     private companion object {
-        const val NO_SEED_ID = -1L
-        const val NO_AMOUNT = -1L
         const val MICRO_ALGO_DECIMALS = 6
     }
 }

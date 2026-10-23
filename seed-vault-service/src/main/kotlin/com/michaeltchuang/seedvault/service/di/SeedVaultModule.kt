@@ -23,7 +23,9 @@ import com.michaeltchuang.seedvault.service.domain.usecase.RevokeAuthorizedAppUs
 import com.michaeltchuang.seedvault.service.domain.usecase.SignBytes
 import com.michaeltchuang.seedvault.service.domain.usecase.ValidateSeedPhrase
 import com.michaeltchuang.seedvault.service.domain.usecase.ValidateSeedPhraseUseCase
+import com.michaeltchuang.seedvault.service.remote.AlgokitTransactionDecoder
 import com.michaeltchuang.seedvault.service.remote.SignApprovalCoordinator
+import com.michaeltchuang.seedvault.service.remote.TransactionDecoder
 import com.michaeltchuang.seedvault.service.ui.viewmodel.AddSeedViewModel
 import com.michaeltchuang.seedvault.service.ui.viewmodel.AuthorizeAppViewModel
 import com.michaeltchuang.seedvault.service.ui.viewmodel.AuthorizedAppsViewModel
@@ -49,6 +51,7 @@ val seedVaultModule =
         single<SeedVaultRepository> { SeedVaultRepositoryImpl(get(), get<RoomSeedKeyVault>(), get<TrustySeedKeyVault>()) }
 
         single { SignApprovalCoordinator() }
+        single<TransactionDecoder> { AlgokitTransactionDecoder }
 
         // Domain
         factory { GetSeeds(get<SeedVaultRepository>()::getSeeds) }

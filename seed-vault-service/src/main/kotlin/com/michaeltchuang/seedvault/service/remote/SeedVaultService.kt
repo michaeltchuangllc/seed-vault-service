@@ -18,12 +18,13 @@ import org.koin.android.ext.android.inject
 
 /**
  * Bound service behind [ISeedVaultService]. Every call is checked against the app that made it:
- * it needs the ACCESS_SEED_VAULT permission, and can only see and sign with seeds it was authorized
- * for by the user. The app is identified by its Binder uid, never by anything it passes in.
+ * it needs the ACCESS_SEED_VAULT permission, and can only see and sign with the addresses of seeds it
+ * was authorized for by the user. The app is identified by its Binder uid, never by anything it passes in.
  */
 class SeedVaultService : Service() {
     private val seedVaultRepository: SeedVaultRepository by inject()
     private val signApprovals: SignApprovalCoordinator by inject()
+    private val transactionDecoder: TransactionDecoder by inject()
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -43,32 +44,31 @@ class SeedVaultService : Service() {
             }
 
             override fun signBytes(
-                seedId: Long,
+                address: String,
                 data: ByteArray,
             ): ByteArray? {
                 val packages = callerPackages()
                 return runBlocking(Dispatchers.IO) {
-                    requireAuthorized(packages, seedId)
-                    requireUserApproval(packages, SignOperation.bytes(seedId, data))
-                    seedVaultRepository.signBytes(seedId, data)
+                    val seed = requireAuthorized(packages, address)
+                    requireUserApproval(packages, SignOperation.bytes(address, data))
+                    seedVaultRepository.signBytes(seed.id, data)
                 }
             }
 
-            override fun signAlgorandPayment(
-                seedId: Long,
-                receiver: String,
-                amountMicroAlgos: Long,
-                paramsJson: String,
+            override fun signTransaction(
+                address: String,
+                transaction: ByteArray,
             ): ByteArray? {
                 val packages = callerPackages()
                 // A malformed request is the caller's mistake, not a signing failure
-                val params =
-                    runCatching { Json.decodeFromString<RemoteAlgorandParams>(paramsJson).toPaymentParams() }
-                        .getOrElse { throw IllegalArgumentException("Invalid Algorand parameters", it) }
+                val decoded =
+                    transactionDecoder.decode(transaction)
+                        ?: throw IllegalArgumentException("The bytes are not an Algorand transaction")
+                require(decoded.sender == address) { "The transaction sender is not $address" }
                 return runBlocking(Dispatchers.IO) {
-                    requireAuthorized(packages, seedId)
-                    requireUserApproval(packages, SignOperation.payment(seedId, receiver, amountMicroAlgos, paramsJson))
-                    seedVaultRepository.signAlgorandPayment(seedId, receiver, amountMicroAlgos, params)
+                    val seed = requireAuthorized(packages, address)
+                    requireUserApproval(packages, SignOperation.transaction(address, transaction))
+                    seedVaultRepository.signTransaction(seed.id, transaction)
                 }
             }
         }
@@ -87,10 +87,10 @@ class SeedVaultService : Service() {
 
     private suspend fun requireAuthorized(
         packages: Set<String>,
-        seedId: Long,
+        address: String,
     ): VaultSeed =
-        authorizedSeeds(packages).firstOrNull { it.id == seedId }
-            ?: throw SecurityException("The calling app is not authorized for seed $seedId")
+        authorizedSeeds(packages).firstOrNull { it.address == address }
+            ?: throw SecurityException("The calling app is not authorized for address $address")
 
     /** Every signature needs one the user approved on the confirm sign screen, which the client starts first. */
     private fun requireUserApproval(

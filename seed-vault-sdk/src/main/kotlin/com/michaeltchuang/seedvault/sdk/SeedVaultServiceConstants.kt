@@ -17,9 +17,7 @@ object SeedVaultServiceConstants {
 
     /** Action of the activity where the user approves a signature. Started with startActivityForResult. */
     const val ACTION_CONFIRM_SIGN = "$PACKAGE.CONFIRM_SIGN"
-    const val EXTRA_SEED_ID = "seed_id"
+    const val EXTRA_ADDRESS = "address"
     const val EXTRA_DATA = "data"
-    const val EXTRA_RECEIVER = "receiver"
-    const val EXTRA_AMOUNT_MICRO_ALGOS = "amount_micro_algos"
-    const val EXTRA_PARAMS_JSON = "params_json"
+    const val EXTRA_TRANSACTION = "transaction"
 }
