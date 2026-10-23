@@ -1,6 +1,6 @@
 ---
 name: seed-vault-conventions
-description: Conventions for the Seed Vault app (seedVaultService) and its sample client (serviceDemoApp). Use before changing seed storage, the SeedKeyVault Room/Trusty abstraction, the AIDL service, app authorization, the Falcon-1024 signing paths, the local .aar libraries, or the demo client's Algorand/Solana tabs.
+description: Conventions for the Seed Vault app (seed-vault-service) and its sample client (seed-vault-demo-app). Use before changing seed storage, the SeedKeyVault Room/Trusty abstraction, the AIDL service, app authorization, the Falcon-1024 signing paths, the local .aar libraries, or the demo client's Algorand/Solana tabs.
 ---
 
 # Seed Vault conventions
@@ -11,10 +11,10 @@ Clean architecture, MVI with `StateDelegate`/`EventDelegate` (from `wallet-sdk-c
 
 | Module | What it is |
 |---|---|
-| `seedVaultService` | Android-only Seed Vault app (`com.michaeltchuang.seedvault.service`). Create/import 25-word Falcon-1024 seeds, view the phrase, authorize apps, bound AIDL service. Own theme (`SeedVaultTheme`). |
-| `serviceDemoApp` | Android-only sample wallet (`com.michaeltchuang.seedvault.demo`). AIDL client of `seedVaultService` on the Algorand tab, client of the Solana Mobile Seed Vault on the Solana tab. |
+| `seed-vault-service` | Android-only Seed Vault app (`com.michaeltchuang.seedvault.service`). Create/import 25-word Falcon-1024 seeds, view the phrase, authorize apps, bound AIDL service. Own theme (`SeedVaultTheme`). |
+| `seed-vault-demo-app` | Android-only sample wallet (`com.michaeltchuang.seedvault.demo`). AIDL client of `seed-vault-service` on the Algorand tab, client of the Solana Mobile Seed Vault on the Solana tab. |
 
-Neither may depend on `wallet-sdk-ui`. `seedVaultService` uses `wallet-sdk-core` as a Maven dependency (`libs.wallet.sdk.core`).
+Neither may depend on `wallet-sdk-ui`. `seed-vault-service` uses `wallet-sdk-core` as a Maven dependency (`libs.wallet.sdk.core`).
 
 ## Where secrets live: `SeedKeyVault`
 
@@ -33,7 +33,7 @@ Rules:
 
 ## AIDL service
 
-- The contract is `ISeedVaultService.aidl` in `seedVaultService/src/main/aidl/...`. **`serviceDemoApp` has a copy; edit both together.** Keep `SeedVaultContract` (service) and `SeedVaultServiceConstants` (client) in sync with the manifests.
+- The contract is `ISeedVaultService.aidl` in `seed-vault-service/src/main/aidl/...`. **`seed-vault-sdk` has a copy; edit both together.** Keep `SeedVaultContract` (service) and `SeedVaultServiceConstants` (client) in sync with the manifests.
 - The service is exported and protected by the dangerous permission `<package>.ACCESS_SEED_VAULT`. Every call also checks the caller's uid, resolved with `Binder.getCallingUid()`, against the seed's `authorized_app` rows. Throw `SecurityException` for an unauthorized caller. Never trust a package name the caller sends.
 - Every AIDL signature needs a matching one-time approval (`SignApprovalCoordinator`, 60 s, per app and exact operation) from the confirm sign screen, where the user verifies with fingerprint / screen lock (`UserAuthenticators`: Trusty applet if it can, else the system prompt). No way to verify means no. Clients call `CONFIRM_SIGN` before every sign call.
 - AIDL returns only public data (id, name, address, public key) and signatures. Never return a seed phrase, entropy, seed or private key.
@@ -43,7 +43,7 @@ Rules:
 - The vault never talks to the network. The client fetches algod params and sends the signed transaction.
 - Anything that can reach a seed phrase or key shows `SecureScreen()` (FLAG_SECURE).
 
-## Demo client (`serviceDemoApp`)
+## Demo client (`seed-vault-demo-app`)
 
 - Two tabs: Algorand (Seed Vault Service over AIDL, TestNet via algod) and Solana (Solana Mobile Seed Vault through its SDK, DevNet). Solana does not depend on the AIDL connection: the Falcon-1024 keys cannot sign Solana transactions.
 - The Solana Mobile Seed Vault is not a bound service. It is a content provider plus activities, reached through the `Wallet` SDK.
@@ -59,8 +59,8 @@ Rules:
 ## Checks
 
 ```
-./gradlew :seedVaultService:ktlintFormat
-./gradlew :seedVaultService:testDebugUnitTest :seedVaultService:ktlintCheck :seedVaultService:assembleDebug :serviceDemoApp:assembleDebug
+./gradlew :seed-vault-service:ktlintFormat
+./gradlew :seed-vault-service:testDebugUnitTest :seed-vault-service:ktlintCheck :seed-vault-service:assembleDebug :seed-vault-demo-app:assembleDebug
 ```
 
-After a package rename or a Room schema change, uninstall the app on the device before installing, and install `seedVaultService` before `serviceDemoApp` so the permission exists when the client is installed.
+After a package rename or a Room schema change, uninstall the app on the device before installing, and install `seed-vault-service` before `seed-vault-demo-app` so the permission exists when the client is installed.

@@ -34,4 +34,4 @@ jobs:
           export VERSION_TAG=${GITHUB_TAG#v}  # Remove the leading 'v'
           echo "Publishing version: $VERSION_TAG"
           echo "Publishing to Maven Central (USER_MANAGED - requires manual release)..."
-          ./gradlew :seedVaultSDK:publishToMavenCentral
+          ./gradlew :seed-vault-sdk:publishToMavenCentral

@@ -1,7 +1,7 @@
 package com.michaeltchuang.seedvault.sdk
 
 /**
- * Names for reaching the Seed Vault Service app. Must match SeedVaultContract in seedVaultService.
+ * Names for reaching the Seed Vault Service app. Must match SeedVaultContract in seed-vault-service.
  */
 object SeedVaultServiceConstants {
     const val PACKAGE = "com.michaeltchuang.seedvault.service"

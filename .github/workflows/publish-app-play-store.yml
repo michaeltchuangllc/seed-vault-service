@@ -43,8 +43,8 @@ jobs:
           # versionName comes from the tag (leading 'v' removed), falling back to the default for manual runs
           if [[ "$GITHUB_TAG" == v* ]]; then export VERSION_TAG=${GITHUB_TAG#v}; fi
           echo "Building and publishing Seed Vault Service to Play Store internal track (run $GITHUB_RUN_NUMBER)..."
-          ./gradlew :seedVaultService:bundleRelease
-          ./gradlew :seedVaultService:publishReleaseBundle --track internal
+          ./gradlew :seed-vault-service:bundleRelease
+          ./gradlew :seed-vault-service:publishReleaseBundle --track internal
 
       - name: Cleanup
         if: always()

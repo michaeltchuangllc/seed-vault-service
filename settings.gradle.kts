@@ -15,6 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "seed-vault-service"
-include(":seedVaultSDK")
-include(":seedVaultService")
-include(":serviceDemoApp")
+include(":seed-vault-sdk")
+include(":seed-vault-service")
+include(":seed-vault-demo-app")

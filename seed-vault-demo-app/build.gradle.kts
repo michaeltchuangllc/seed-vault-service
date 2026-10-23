@@ -54,7 +54,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":seedVaultSDK"))
+    implementation(project(":seed-vault-sdk"))
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

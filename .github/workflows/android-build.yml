@@ -74,4 +74,4 @@ jobs:
           java-version: "21"
           cache: "gradle"
       - name: "Assemble Debug"
-        run: ./gradlew :seedVaultService:assembleDebug :seedVaultSDK:assembleDebug :serviceDemoApp:assembleDebug
+        run: ./gradlew :seed-vault-service:assembleDebug :seed-vault-sdk:assembleDebug :seed-vault-demo-app:assembleDebug
