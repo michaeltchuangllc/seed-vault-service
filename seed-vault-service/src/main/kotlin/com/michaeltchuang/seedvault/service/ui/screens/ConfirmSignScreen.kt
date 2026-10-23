@@ -63,7 +63,7 @@ fun ConfirmSignScreen(
     // Only a seed the app is authorized for can be signed with, anything else is a no
     val getSeeds: GetSeeds = koinInject()
     val seed by produceState<SeedLookup>(SeedLookup.Loading, request) {
-        val found = getSeeds().first().firstOrNull { it.address == request.operation.address }
+        val found = getSeeds().first().firstOrNull { it.indexOf(request.operation.address) != null }
         value = SeedLookup.Done(found?.takeIf { seed -> seed.authorizedApps.any { it.packageName == request.callerPackage } })
     }
     val lookup = seed

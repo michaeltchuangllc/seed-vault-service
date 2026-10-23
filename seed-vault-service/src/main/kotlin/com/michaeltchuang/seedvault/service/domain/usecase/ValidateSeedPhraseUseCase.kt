@@ -1,6 +1,6 @@
 package com.michaeltchuang.seedvault.service.domain.usecase
 
-import com.michaeltchuang.walletsdk.core.algosdk.getFalcon25EntropyFromMnemonic
+import com.michaeltchuang.seedvault.service.data.vault.Falcon1024
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,7 +12,7 @@ internal class ValidateSeedPhraseUseCase(
         withContext(coroutineDispatcher) {
             if (words.size != SEED_PHRASE_WORD_COUNT) return@withContext false
             // Decoding fails on unknown words and on a wrong checksum word
-            runCatching { getFalcon25EntropyFromMnemonic(words.joinToString(" ")) }
+            runCatching { Falcon1024.entropyFromSeedPhrase(words) }
                 .onSuccess { entropy -> entropy.fill(0) }
                 .isSuccess
         }

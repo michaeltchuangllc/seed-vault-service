@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +52,7 @@ import com.michaeltchuang.seedvault.demo.ui.viewmodel.WalletServiceDemoViewModel
 import com.michaeltchuang.seedvault.sdk.SeedVaultServiceConstants
 import com.michaeltchuang.seedvault.sdk.client.SolanaSeedVaultClient
 import com.michaeltchuang.seedvault.sdk.data.repository.AlgorandRepository
+import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultAccount
 import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultSeed
 import com.michaeltchuang.seedvault.sdk.domain.model.SolanaAccount
 
@@ -242,10 +244,10 @@ private fun ColumnScope.AlgorandTab(
             uiState.seedVaultSeeds.forEach { seed ->
                 SeedVaultSeedCard(
                     seed = seed,
-                    balanceMicroAlgos = uiState.algorandBalances[seed.address],
+                    balances = uiState.algorandBalances,
                     enabled = !uiState.loading,
-                    onSign = { viewModel.signDemoMessage(seed) },
-                    onSendZero = { viewModel.sendZeroAlgoPayment(seed) },
+                    onSign = { address -> viewModel.signDemoMessage(seed, address) },
+                    onSendZero = { address -> viewModel.sendZeroAlgoPayment(seed, address) },
                 )
             }
         }
@@ -533,16 +535,19 @@ private fun launchSeedVault(context: Context) {
     context.startActivity(intent)
 }
 
+/**
+ * One Seed Vault Service seed and a section for each of its accounts, in the order the service
+ * returns them. Today that is index 0 (every signature needs the user's fingerprint on the confirm
+ * sign screen) and index 1 (autosign, no prompt while the user allows it).
+ */
 @Composable
 fun SeedVaultSeedCard(
     seed: SeedVaultSeed,
-    balanceMicroAlgos: Long?,
+    balances: Map<String, Long>,
     enabled: Boolean,
-    onSign: () -> Unit,
-    onSendZero: () -> Unit,
+    onSign: (address: String) -> Unit,
+    onSendZero: (address: String) -> Unit,
 ) {
-    val context = LocalContext.current
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -553,77 +558,129 @@ fun SeedVaultSeedCard(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = seed.address.take(10) + "..." + seed.address.takeLast(10),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            if (seed.accounts.isEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = seed.address,
-                    style = MaterialTheme.typography.labelSmall,
+                    text = "No accounts: update Seed Vault Service",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
                 )
-
-                Button(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Falcon-1024 Address", seed.address)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Address copied!", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier =
-                        Modifier
-                            .padding(start = 8.dp)
-                            .height(28.dp),
-                    contentPadding =
-                        androidx.compose.foundation.layout
-                            .PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = "Copy",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Public key: ${seed.publicKey.take(24)}...",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    if (balanceMicroAlgos != null) {
-                        "Balance: %.6f ALGO (TestNet)".format(balanceMicroAlgos / AlgorandRepository.MICRO_ALGOS_PER_ALGO)
-                    } else {
-                        "Balance: tap Refresh Balances"
-                    },
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(onClick = onSign, modifier = Modifier.weight(1f), enabled = enabled) {
-                    Text("Sign bytes")
-                }
-                Button(onClick = onSendZero, modifier = Modifier.weight(1f), enabled = enabled) {
-                    Text("Send 0 ALGO")
-                }
+            seed.accounts.forEach { account ->
+                SeedAddressSection(
+                    title = account.title(),
+                    subtitle = account.subtitle(),
+                    address = account.address,
+                    publicKey = account.publicKey,
+                    balanceMicroAlgos = balances[account.address],
+                    enabled = enabled,
+                    onSign = { onSign(account.address) },
+                    onSendZero = { onSendZero(account.address) },
+                )
             }
+        }
+    }
+}
+
+private fun SeedVaultAccount.title(): String = "Index $index · " + if (isAutosign) "Autosign" else "Fingerprint sign"
+
+// requiresApproval is only as of the last Fetch Seeds: the vault checks autosign on every signature
+private fun SeedVaultAccount.subtitle(): String =
+    when {
+        !isAutosign -> "Every signature is approved with your fingerprint in Seed Vault"
+        !requiresApproval -> "Autosign was on at last fetch: signs without a prompt"
+        else ->
+            "Autosign was off at last fetch: turn it on in Seed Vault > Security, " +
+                "otherwise it needs your fingerprint"
+    }
+
+@Composable
+private fun SeedAddressSection(
+    title: String,
+    subtitle: String,
+    address: String,
+    publicKey: String,
+    balanceMicroAlgos: Long?,
+    enabled: Boolean,
+    onSign: () -> Unit,
+    onSendZero: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    Spacer(modifier = Modifier.height(12.dp))
+    HorizontalDivider()
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = address.take(10) + "..." + address.takeLast(10),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+
+        Button(
+            onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Falcon-1024 Address", address))
+                Toast.makeText(context, "Address copied!", Toast.LENGTH_SHORT).show()
+            },
+            modifier =
+                Modifier
+                    .padding(start = 8.dp)
+                    .height(28.dp),
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = "Copy",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+    Text(
+        text = "Public key: ${publicKey.take(24)}...",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+        text =
+            if (balanceMicroAlgos != null) {
+                "Balance: %.6f ALGO (TestNet)".format(balanceMicroAlgos / AlgorandRepository.MICRO_ALGOS_PER_ALGO)
+            } else {
+                "Balance: tap Refresh Balances"
+            },
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(onClick = onSign, modifier = Modifier.weight(1f), enabled = enabled) {
+            Text("Sign bytes")
+        }
+        Button(onClick = onSendZero, modifier = Modifier.weight(1f), enabled = enabled) {
+            Text("Send 0 ALGO")
         }
     }
 }

@@ -27,11 +27,26 @@ object SeedVaultContract {
     const val EXTRA_TRANSACTION = "transaction"
 }
 
-/** A seed as returned by `getAuthorizedSeeds`. [publicKey] is Base64 encoded. */
+/** A seed as returned by `getAuthorizedSeeds`, with every account it has, by address index. */
 @Serializable
 data class RemoteSeed(
     val id: Long,
     val name: String,
+    val accounts: List<RemoteAccount>,
+)
+
+/**
+ * One Falcon-1024 account of a seed. [publicKey] is Base64 encoded.
+ *
+ * @param isAutosign the account can sign without the user while they allow autosign
+ * @param requiresApproval whether signing needs the confirm sign screen, as of this call. The service
+ * checks again on every signature, since the user can change autosign at any time
+ */
+@Serializable
+data class RemoteAccount(
+    val index: Int,
     val address: String,
     val publicKey: String,
+    val isAutosign: Boolean = false,
+    val requiresApproval: Boolean = true,
 )

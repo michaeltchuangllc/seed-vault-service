@@ -7,6 +7,8 @@ import android.os.Binder
 import android.os.IBinder
 import android.util.Base64
 import com.michaeltchuang.seedvault.service.ISeedVaultService
+import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
+import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
 import kotlinx.coroutines.Dispatchers
@@ -18,13 +20,17 @@ import org.koin.android.ext.android.inject
 
 /**
  * Bound service behind [ISeedVaultService]. Every call is checked against the app that made it:
- * it needs the ACCESS_SEED_VAULT permission, and can only see and sign with the addresses of seeds it
+ * it needs the ACCESS_SEED_VAULT permission, and can only see and sign with the accounts of seeds it
  * was authorized for by the user. The app is identified by its Binder uid, never by anything it passes in.
+ *
+ * Signing with a seed's human sign address always needs an approval from the confirm sign screen.
+ * Signing with its autosign address does not while the user allows autosign, and does otherwise.
  */
 class SeedVaultService : Service() {
     private val seedVaultRepository: SeedVaultRepository by inject()
     private val signApprovals: SignApprovalCoordinator by inject()
     private val transactionDecoder: TransactionDecoder by inject()
+    private val autosignSettings: AutosignSettings by inject()
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -49,9 +55,9 @@ class SeedVaultService : Service() {
             ): ByteArray? {
                 val packages = callerPackages()
                 return runBlocking(Dispatchers.IO) {
-                    val seed = requireAuthorized(packages, address)
-                    requireUserApproval(packages, SignOperation.bytes(address, data))
-                    seedVaultRepository.signBytes(seed.id, data)
+                    val index = requireAuthorized(packages, address)
+                    requireUserApproval(packages, index, SignOperation.bytes(address, data))
+                    seedVaultRepository.signBytes(address, data)
                 }
             }
 
@@ -66,9 +72,9 @@ class SeedVaultService : Service() {
                         ?: throw IllegalArgumentException("The bytes are not an Algorand transaction")
                 require(decoded.sender == address) { "The transaction sender is not $address" }
                 return runBlocking(Dispatchers.IO) {
-                    val seed = requireAuthorized(packages, address)
-                    requireUserApproval(packages, SignOperation.transaction(address, transaction))
-                    seedVaultRepository.signTransaction(seed.id, transaction)
+                    val index = requireAuthorized(packages, address)
+                    requireUserApproval(packages, index, SignOperation.transaction(address, transaction))
+                    seedVaultRepository.signTransaction(address, transaction)
                 }
             }
         }
@@ -85,22 +91,31 @@ class SeedVaultService : Service() {
         return packageManager.getPackagesForUid(Binder.getCallingUid()).orEmpty().toSet()
     }
 
+    /** The address index of [address] in a seed the caller is authorized for. */
     private suspend fun requireAuthorized(
         packages: Set<String>,
         address: String,
-    ): VaultSeed =
-        authorizedSeeds(packages).firstOrNull { it.address == address }
+    ): Int =
+        authorizedSeeds(packages).firstNotNullOfOrNull { it.indexOf(address) }
             ?: throw SecurityException("The calling app is not authorized for address $address")
 
-    /** Every signature needs one the user approved on the confirm sign screen, which the client starts first. */
+    /**
+     * Every signature needs one the user approved on the confirm sign screen, which the client starts
+     * first. The exception is the autosign address while the user allows autosign.
+     */
     private fun requireUserApproval(
         packages: Set<String>,
+        addressIndex: Int,
         operation: SignOperation,
     ) {
+        if (!requiresApproval(addressIndex)) return
         if (!signApprovals.consume(packages, operation)) {
             throw SecurityException("The user has not approved this signature. Start ${SeedVaultContract.ACTION_CONFIRM_SIGN} first")
         }
     }
+
+    /** Whether a signature with the account at [addressIndex] needs the confirm sign screen right now. */
+    private fun requiresApproval(addressIndex: Int): Boolean = !(addressIndex == AUTOSIGN_ADDRESS_INDEX && autosignSettings.isEnabled.value)
 
     private suspend fun authorizedSeeds(packages: Set<String>): List<VaultSeed> =
         seedVaultRepository
@@ -112,7 +127,17 @@ class SeedVaultService : Service() {
         RemoteSeed(
             id = id,
             name = name,
-            address = address,
-            publicKey = Base64.encodeToString(checkNotNull(seedVaultRepository.getPublicKey(id)), Base64.NO_WRAP),
+            accounts =
+                addresses.map { account ->
+                    val publicKey =
+                        checkNotNull(seedVaultRepository.getPublicKey(account.address)) { "No public key for ${account.address}" }
+                    RemoteAccount(
+                        index = account.index,
+                        address = account.address,
+                        publicKey = Base64.encodeToString(publicKey, Base64.NO_WRAP),
+                        isAutosign = account.isAutosign,
+                        requiresApproval = requiresApproval(account.index),
+                    )
+                },
         )
 }

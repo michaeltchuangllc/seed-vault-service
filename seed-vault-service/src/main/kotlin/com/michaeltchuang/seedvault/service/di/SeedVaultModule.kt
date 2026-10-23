@@ -5,6 +5,8 @@ import com.michaeltchuang.seedvault.service.data.auth.TrustyUserAuthenticator
 import com.michaeltchuang.seedvault.service.data.auth.UserAuthenticators
 import com.michaeltchuang.seedvault.service.data.database.SeedVaultDatabase
 import com.michaeltchuang.seedvault.service.data.repository.SeedVaultRepositoryImpl
+import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
+import com.michaeltchuang.seedvault.service.data.settings.SharedPreferencesAutosignSettings
 import com.michaeltchuang.seedvault.service.data.vault.RoomSeedKeyVault
 import com.michaeltchuang.seedvault.service.data.vault.TrustySeedKeyVault
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
@@ -48,6 +50,7 @@ val seedVaultModule =
         single { RoomSeedKeyVault() }
         single { TrustySeedKeyVault() }
         single { UserAuthenticators(trusty = TrustyUserAuthenticator(), os = OsUserAuthenticator(androidContext())) }
+        single<AutosignSettings> { SharedPreferencesAutosignSettings(androidContext()) }
         single<SeedVaultRepository> { SeedVaultRepositoryImpl(get(), get<RoomSeedKeyVault>(), get<TrustySeedKeyVault>()) }
 
         single { SignApprovalCoordinator() }

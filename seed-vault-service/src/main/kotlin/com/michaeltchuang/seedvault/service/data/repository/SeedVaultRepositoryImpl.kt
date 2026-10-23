@@ -2,13 +2,16 @@ package com.michaeltchuang.seedvault.service.data.repository
 
 import android.util.Log
 import com.michaeltchuang.seedvault.service.data.database.AuthorizedAppEntity
+import com.michaeltchuang.seedvault.service.data.database.SeedAccountEntity
 import com.michaeltchuang.seedvault.service.data.database.SeedDao
 import com.michaeltchuang.seedvault.service.data.database.SeedEntity
 import com.michaeltchuang.seedvault.service.data.database.SeedWithApps
 import com.michaeltchuang.seedvault.service.data.vault.SeedKeyVault
 import com.michaeltchuang.seedvault.service.data.vault.SeedStorage
+import com.michaeltchuang.seedvault.service.data.vault.StoredAccount
 import com.michaeltchuang.seedvault.service.data.vault.StoredSeed
 import com.michaeltchuang.seedvault.service.domain.model.AuthorizedApp
+import com.michaeltchuang.seedvault.service.domain.model.VaultAddress
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,7 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * Room backed [SeedVaultRepository]. Names, backup state, addresses, public keys and authorized
+ * Room backed [SeedVaultRepository]. Names, backup state, accounts, public keys and authorized
  * apps live in Room. The secret keys live in a [SeedKeyVault]: the Trusty applet in the TEE when the
  * device has one, otherwise encrypted in the database with the Android Keystore. Each seed
  * remembers which one holds its keys.
@@ -43,18 +46,27 @@ internal class SeedVaultRepositoryImpl(
             val stored = vault.addSeed(seedPhrase)
             val id =
                 seedDao.insertWithDefaultName(
-                    SeedEntity(
-                        name = "",
-                        isBackedUp = isBackedUp,
-                        encryptedEntropy = stored.encryptedEntropy,
-                        address = stored.address,
-                        publicKey = stored.publicKey,
-                        encryptedPrivateKey = stored.encryptedPrivateKey,
-                        storage = vault.storage.name,
-                    ),
+                    seed =
+                        SeedEntity(
+                            name = "",
+                            isBackedUp = isBackedUp,
+                            encryptedEntropy = stored.encryptedEntropy,
+                            storage = vault.storage,
+                        ),
+                    accounts =
+                        stored.accounts.map {
+                            SeedAccountEntity(
+                                seedId = 0,
+                                addressIndex = it.index,
+                                address = it.address,
+                                salt = it.salt,
+                                publicKey = it.publicKey,
+                                encryptedPrivateKey = it.encryptedPrivateKey,
+                            )
+                        },
                 )
             val saved = checkNotNull(seedDao.get(id)) { "Seed $id was not saved" }
-            if (saved.seed.storage != vault.storage.name) {
+            if (saved.seed.storage != vault.storage) {
                 // The phrase was already stored somewhere else, so the keys just added are not needed
                 vault.deleteSeed(stored)
             }
@@ -62,30 +74,30 @@ internal class SeedVaultRepositoryImpl(
         }
 
     override suspend fun signBytes(
-        seedId: Long,
+        address: String,
         data: ByteArray,
     ): ByteArray? =
         withContext(coroutineDispatcher) {
-            val seed = seedDao.getSeed(seedId) ?: return@withContext null
-            vaultFor(seed).signBytes(seed.toStoredSeed(), data)
+            val (seed, index) = seedOf(address) ?: return@withContext null
+            vaultFor(seed.seed).signBytes(seed.toStoredSeed(), index, data)
         }
 
     override suspend fun signTransaction(
-        seedId: Long,
+        address: String,
         transaction: ByteArray,
     ): ByteArray? =
         withContext(coroutineDispatcher) {
-            val seed = seedDao.getSeed(seedId) ?: return@withContext null
-            vaultFor(seed).signTransaction(seed.toStoredSeed(), transaction)
+            val (seed, index) = seedOf(address) ?: return@withContext null
+            vaultFor(seed.seed).signTransaction(seed.toStoredSeed(), index, transaction)
         }
 
     override suspend fun getSeedPhrase(seedId: Long): List<String>? =
         withContext(coroutineDispatcher) {
-            val seed = seedDao.getSeed(seedId) ?: return@withContext null
-            vaultFor(seed).revealSeedPhrase(seed.toStoredSeed())
+            val seed = seedDao.get(seedId) ?: return@withContext null
+            vaultFor(seed.seed).revealSeedPhrase(seed.toStoredSeed())
         }
 
-    override suspend fun getPublicKey(seedId: Long): ByteArray? = seedDao.getPublicKey(seedId)
+    override suspend fun getPublicKey(address: String): ByteArray? = seedDao.getPublicKey(address)
 
     override suspend fun authorizeApp(
         seedId: Long,
@@ -107,7 +119,7 @@ internal class SeedVaultRepositoryImpl(
     override suspend fun deleteSeed(seedId: Long) {
         withContext(coroutineDispatcher) {
             // The keys go first: if they cannot be removed the seed stays, so it can be tried again
-            seedDao.getSeed(seedId)?.let { vaultFor(it).deleteSeed(it.toStoredSeed()) }
+            seedDao.get(seedId)?.let { vaultFor(it.seed).deleteSeed(it.toStoredSeed()) }
             seedDao.delete(seedId)
         }
     }
@@ -119,10 +131,17 @@ internal class SeedVaultRepositoryImpl(
         seedDao.revokeApp(seedId, packageName)
     }
 
+    /** The seed that has [address], with the index of the address, or null if no seed has it. */
+    private suspend fun seedOf(address: String): Pair<SeedWithApps, Int>? {
+        val row = seedDao.getAccount(address) ?: return null
+        val seed = seedDao.get(row.seedId) ?: return null
+        return seed to row.addressIndex
+    }
+
     /** The vault that holds the keys of [seed]. */
     private suspend fun vaultFor(seed: SeedEntity): SeedKeyVault {
         val vault =
-            when (SeedStorage.valueOf(seed.storage)) {
+            when (seed.storage) {
                 SeedStorage.ROOM -> roomVault
                 SeedStorage.TRUSTY -> trustyVault
             }
@@ -130,12 +149,19 @@ internal class SeedVaultRepositoryImpl(
         return vault
     }
 
-    private fun SeedEntity.toStoredSeed() =
+    private fun SeedWithApps.toStoredSeed() =
         StoredSeed(
-            address = address,
-            publicKey = publicKey,
-            encryptedEntropy = encryptedEntropy,
-            encryptedPrivateKey = encryptedPrivateKey,
+            encryptedEntropy = seed.encryptedEntropy,
+            accounts =
+                accounts.map {
+                    StoredAccount(
+                        index = it.addressIndex,
+                        address = it.address,
+                        salt = it.salt,
+                        publicKey = it.publicKey,
+                        encryptedPrivateKey = it.encryptedPrivateKey,
+                    )
+                },
         )
 
     private fun SeedWithApps.toVaultSeed() =
@@ -147,7 +173,7 @@ internal class SeedVaultRepositoryImpl(
                 apps.map {
                     AuthorizedApp(packageName = it.packageName, label = it.label, isPrivileged = it.isPrivileged)
                 },
-            address = seed.address,
+            addresses = accounts.sortedBy { it.addressIndex }.map { VaultAddress(index = it.addressIndex, address = it.address) },
         )
 
     private companion object {

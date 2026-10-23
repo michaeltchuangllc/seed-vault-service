@@ -8,10 +8,20 @@ package com.michaeltchuang.seedvault.service;
  * launching the AUTHORIZE_APP activity with startActivityForResult. Seeds are never returned,
  * only their public data and signatures.
  *
- * Every signature needs the user. Before calling a sign method, start the CONFIRM_SIGN activity with
- * startActivityForResult and the values you are about to sign (see SeedVaultContract). The user
- * sees them, verifies themselves (fingerprint or screen lock) and approves. After RESULT_OK, call
- * the sign method with the same values within a minute. An approval works once, for one call.
+ * Every seed has one or more Falcon-1024 accounts (see getAuthorizedSeeds), each with an index, an
+ * address and a public key. Today that is index 0, the human sign account, and index 1, the autosign
+ * account. Apps should not assume either count: loop over the accounts and read requiresApproval.
+ *
+ * A signature with the human sign account always needs the user. Before calling a sign method, start
+ * the CONFIRM_SIGN activity with startActivityForResult and the values you are about to sign (see
+ * SeedVaultContract). The user sees them, verifies themselves (fingerprint or screen lock) and
+ * approves. After RESULT_OK, call the sign method with the same values within a minute. An approval
+ * works once, for one call.
+ *
+ * A signature with the autosign account (isAutosign) needs no approval while the user allows
+ * autosign in the Seed Vault security settings. While they do not, it needs one like the human sign
+ * account. requiresApproval says which applies as of getAuthorizedSeeds; the service checks again
+ * on every signature.
  *
  * Keep the seed-vault-sdk and seed-vault-service copies in sync. Client apps depend on SeedVaultSDK.
  */
@@ -22,17 +32,18 @@ interface ISeedVaultService {
 
     /**
      * Get the seeds the calling app is authorized to use.
-     * Returns: JSON array of {id, name, address, publicKey} where publicKey is Base64 encoded
-     * and address is the Falcon-1024 account address.
+     * Returns: JSON array of {id, name, accounts} where accounts is an array, by index, of
+     * {index, address, publicKey, isAutosign, requiresApproval}: publicKey is the Base64 encoded
+     * Falcon-1024 public key of the account. isAutosign false and requiresApproval true may be left out.
      */
     String getAuthorizedSeeds();
 
     /**
      * Sign a byte array with the Falcon-1024 private key of a seed.
-     * @param address address of a seed returned by getAuthorizedSeeds, the account that signs
+     * @param address the address of an account returned by getAuthorizedSeeds, the account that signs
      * @param data the bytes to sign
      * @return the signature, or null if signing failed
-     * @throws SecurityException if the calling app is not authorized for the address, or there is no matching user approval
+     * @throws SecurityException if the calling app is not authorized for the address, or the address needs a user approval and there is none
      * @throws IllegalArgumentException if the vault refuses the data, e.g. it looks like a transaction
      */
     byte[] signBytes(String address, in byte[] data);
@@ -41,11 +52,11 @@ interface ISeedVaultService {
      * Sign an unsigned Algorand transaction with the Falcon-1024 key of a seed. The user is shown what
      * the transaction does (type, receiver, amount, fee, and a warning for a rekey or close-out) on the
      * confirm sign screen, so pass exactly the bytes you started it with.
-     * @param address address of a seed returned by getAuthorizedSeeds, the account that signs. It must
+     * @param address the address of an account returned by getAuthorizedSeeds, the account that signs. It must
      * be the sender of the transaction
      * @param transaction the msgpack encoded unsigned transaction, without the "TX" prefix
      * @return the signed transaction, ready to send to algod, or null if signing failed
-     * @throws SecurityException if the calling app is not authorized for the address, or there is no matching user approval
+     * @throws SecurityException if the calling app is not authorized for the address, or the address needs a user approval and there is none
      * @throws IllegalArgumentException if the bytes are not a transaction, or its sender is not the address
      */
     byte[] signTransaction(String address, in byte[] transaction);

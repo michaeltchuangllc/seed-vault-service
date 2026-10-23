@@ -1,10 +1,5 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
-import com.michaeltchuang.walletsdk.core.algosdk.getFalcon25MnemonicFromEntropy
-import com.michaeltchuang.walletsdk.core.algosdk.getFalcon25SeedFromEntropy
-import com.michaeltchuang.walletsdk.core.algosdk.recoverFalcon25Account
-import com.michaeltchuang.walletsdk.core.algosdk.signFalcon25ArbitraryData
-import com.michaeltchuang.walletsdk.core.algosdk.signFalcon25Transaction
 import com.michaeltchuang.walletsdk.core.encryption.decryptByteArray
 import com.michaeltchuang.walletsdk.core.encryption.encryptByteArray
 import com.michaeltchuang.walletsdk.core.encryption.initializeEncryptionManager
@@ -12,9 +7,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Keeps the entropy behind each seed phrase and the derived private key encrypted with the AES-GCM
- * Android Keystore key from wallet-sdk-core, in the seed row. Used when the device has no Trusty
- * applet.
+ * Keeps the entropy behind each seed phrase (in the seed row) and the Falcon-1024 private key of
+ * each account (in its account row) encrypted with the AES-GCM Android Keystore key from
+ * wallet-sdk-core. Used when the device has no Trusty applet. The keys are derived and used with the
+ * algokit-core Rust FFI ([Falcon1024]).
  */
 internal class RoomSeedKeyVault : SeedKeyVault {
     override val storage = SeedStorage.ROOM
@@ -26,18 +22,19 @@ internal class RoomSeedKeyVault : SeedKeyVault {
 
     override suspend fun addSeed(seedPhrase: List<String>): StoredSeed {
         ensureEncryptionKey()
-        val account = checkNotNull(recoverFalcon25Account(seedPhrase.joinToString(" "))) { "Could not derive the Falcon-1024 account" }
-        return try {
-            StoredSeed(
-                address = account.address,
-                publicKey = account.publicKey,
-                encryptedEntropy = encryptByteArray(account.entropy),
-                encryptedPrivateKey = encryptByteArray(account.privateKey),
-            )
+        val entropy = Falcon1024.entropyFromSeedPhrase(seedPhrase)
+        try {
+            val account = Falcon1024.accountFromEntropy(entropy)
+            try {
+                return StoredSeed(
+                    encryptedEntropy = encryptByteArray(entropy),
+                    accounts = Falcon1024.accounts(account.publicKey, encryptByteArray(account.privateKey)),
+                )
+            } finally {
+                account.privateKey.fill(0)
+            }
         } finally {
-            account.entropy.fill(0)
-            account.seed.fill(0)
-            account.privateKey.fill(0)
+            entropy.fill(0)
         }
     }
 
@@ -45,8 +42,7 @@ internal class RoomSeedKeyVault : SeedKeyVault {
         ensureEncryptionKey()
         val entropy = decryptByteArray(seed.encryptedEntropy)
         try {
-            return checkNotNull(getFalcon25MnemonicFromEntropy(entropy)) { "Could not encode the Falcon-1024 seed phrase" }
-                .split(" ")
+            return Falcon1024.seedPhraseFromEntropy(entropy)
         } finally {
             entropy.fill(0)
         }
@@ -54,38 +50,36 @@ internal class RoomSeedKeyVault : SeedKeyVault {
 
     override suspend fun signBytes(
         seed: StoredSeed,
+        addressIndex: Int,
         data: ByteArray,
+    ): ByteArray? = withPrivateKey(seed.account(addressIndex)) { privateKey -> Falcon1024.signBytes(privateKey, data) }
+
+    override suspend fun signTransaction(
+        seed: StoredSeed,
+        addressIndex: Int,
+        transaction: ByteArray,
     ): ByteArray? {
+        val account = seed.account(addressIndex)
+        return withPrivateKey(account) { privateKey ->
+            Falcon1024.signTransaction(account.publicKey, privateKey, account.salt, transaction)
+        }
+    }
+
+    /** The secrets only exist in the seed and account rows, which the repository deletes. */
+    override suspend fun deleteSeed(seed: StoredSeed) = Unit
+
+    private suspend fun <T> withPrivateKey(
+        account: StoredAccount,
+        block: (ByteArray) -> T,
+    ): T {
         ensureEncryptionKey()
-        val privateKey = decryptByteArray(seed.encryptedPrivateKey)
+        val privateKey = decryptByteArray(account.encryptedPrivateKey)
         try {
-            return signFalcon25ArbitraryData(data, seed.publicKey, privateKey)
+            return block(privateKey)
         } finally {
             privateKey.fill(0)
         }
     }
-
-    override suspend fun signTransaction(
-        seed: StoredSeed,
-        transaction: ByteArray,
-    ): ByteArray? {
-        ensureEncryptionKey()
-        val entropy = decryptByteArray(seed.encryptedEntropy)
-        val falconSeed =
-            try {
-                getFalcon25SeedFromEntropy(entropy)
-            } finally {
-                entropy.fill(0)
-            } ?: return null
-        try {
-            return signFalcon25Transaction(transaction, falconSeed)
-        } finally {
-            falconSeed.fill(0)
-        }
-    }
-
-    /** The secrets only exist in the seed row, which the repository deletes. */
-    override suspend fun deleteSeed(seed: StoredSeed) = Unit
 
     /**
      * Creates the Keystore key before the first encrypt / decrypt. wallet-sdk-core also does this

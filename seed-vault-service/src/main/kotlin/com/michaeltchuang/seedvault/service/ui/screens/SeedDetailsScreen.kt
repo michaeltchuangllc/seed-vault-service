@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -113,6 +115,10 @@ private fun SeedDetailsContent(
                 modifier = Modifier.padding(start = 4.dp),
             )
             SeedNameCard(name = seed.name, onEditClick = { showRenameDialog = true })
+            if (seed.addresses.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                SeedAddressesCard(seed = seed)
+            }
 
             Spacer(modifier = Modifier.height(40.dp))
             SeedPhraseSection(
@@ -211,6 +217,36 @@ private fun SeedNameCard(
                 painter = painterResource(R.drawable.ic_edit),
                 contentDescription = stringResource(R.string.edit_seed_name),
             )
+        }
+    }
+}
+
+/** The accounts of the seed, all signed for by its one key. Selectable, so they can be copied. */
+@Composable
+private fun SeedAddressesCard(seed: VaultSeed) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        SelectionContainer {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                seed.addresses.forEachIndexed { position, address ->
+                    if (position > 0) Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(if (address.isAutosign) R.string.seed_autosign_address else R.string.seed_address),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = address.address,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
         }
     }
 }

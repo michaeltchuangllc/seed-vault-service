@@ -14,6 +14,7 @@ import com.michaeltchuang.seedvault.sdk.data.repository.AlgorandRepository
 import com.michaeltchuang.seedvault.sdk.data.repository.SolanaBalanceRepository
 import com.michaeltchuang.seedvault.sdk.data.repository.SolanaBalanceRepository.Cluster
 import com.michaeltchuang.seedvault.sdk.data.repository.SolanaTransferRepository
+import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultAccount
 import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultLimits
 import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultSeed
 import com.michaeltchuang.seedvault.sdk.domain.model.SolanaSeed
@@ -115,7 +116,8 @@ class WalletServiceDemoViewModel(
     }
 
     /**
-     * Fetch the Falcon-1024 seeds this app is authorized to use from Seed Vault Service.
+     * Fetch the Falcon-1024 seeds this app is authorized to use from Seed Vault Service, then the
+     * TestNet balance of each of their accounts.
      */
     fun fetchSeedVaultSeeds() {
         if (!_uiState.value.serviceConnected) {
@@ -135,6 +137,7 @@ class WalletServiceDemoViewModel(
                         loading = false,
                     )
                 }
+                if (seeds.isNotEmpty()) refreshAlgorandBalances()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -147,43 +150,44 @@ class WalletServiceDemoViewModel(
     }
 
     /**
-     * Sign [SIGN_DEMO_MESSAGE] with a seed over AIDL and show the size and start of the signature.
+     * Sign [SIGN_DEMO_MESSAGE] with one of a seed's addresses over AIDL and show the size and start of
+     * the signature. The human sign address goes through the confirm sign screen (fingerprint); the
+     * autosign address signs straight away while the user allows autosign.
      */
-    fun signDemoMessage(seed: SeedVaultSeed) {
+    fun signDemoMessage(
+        seed: SeedVaultSeed,
+        address: String,
+    ) {
         val data = SIGN_DEMO_MESSAGE.toByteArray()
-        requestConfirmation(seedVaultClient.confirmSignBytesIntent(seed.address, data)) { signDemoMessageApproved(seed) }
-    }
-
-    private fun signDemoMessageApproved(seed: SeedVaultSeed) {
+        val signer = "${seed.name} (${seed.addressLabel(address)})"
         _uiState.update { it.copy(loading = true, errorMessage = null, signResult = null) }
 
-        viewModelScope.launch {
-            try {
-                val signature =
-                    withContext(Dispatchers.IO) {
-                        seedVaultClient.signBytes(seed.address, SIGN_DEMO_MESSAGE.toByteArray())
-                    }
+        signWithApproval(
+            autosign = seed.signsWithoutApproval(address),
+            confirmationIntent = { seedVaultClient.confirmSignBytesIntent(address, data) },
+            sign = { withContext(Dispatchers.IO) { seedVaultClient.signBytes(address, data) } },
+            onSigned = { signature ->
                 _uiState.update {
                     it.copy(
                         signResult =
                             if (signature == null) {
-                                "Signing failed for ${seed.name}"
+                                "Signing failed for $signer"
                             } else {
-                                "${seed.name} signed \"$SIGN_DEMO_MESSAGE\": ${signature.size} bytes, " +
+                                "$signer signed \"$SIGN_DEMO_MESSAGE\": ${signature.size} bytes, " +
                                     signature.take(16).joinToString("") { b -> "%02x".format(b) } + "..."
                             },
                         loading = false,
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(errorMessage = "Failed to sign: ${e.message}", loading = false)
-                }
-            }
-        }
+            },
+            onError = { e ->
+                Log.e("WalletServiceDemo", "Signing failed", e)
+                _uiState.update { it.copy(errorMessage = "Failed to sign: ${e.message}", loading = false) }
+            },
+        )
     }
 
-    /** Fetch the TestNet ALGO balance of every authorized seed's account from algod. */
+    /** Fetch the TestNet ALGO balance of every address of every authorized seed from algod. */
     fun refreshAlgorandBalances() {
         val seeds = _uiState.value.seedVaultSeeds
         if (seeds.isEmpty()) {
@@ -196,12 +200,14 @@ class WalletServiceDemoViewModel(
         viewModelScope.launch {
             val balances = mutableMapOf<String, Long>()
             var failed = 0
-            seeds.forEach { seed ->
+            seeds.flatMap { seed -> seed.accounts.map { it.address } }.forEach { address ->
                 try {
-                    balances[seed.address] = algorandRepository.getBalanceMicroAlgos(seed.address)
+                    balances[address] = algorandRepository.getBalanceMicroAlgos(address)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     failed++
-                    Log.e("WalletServiceDemo", "Algorand balance failed for ${seed.address}", e)
+                    Log.e("WalletServiceDemo", "Algorand balance failed for $address", e)
                 }
             }
             _uiState.update {
@@ -215,55 +221,88 @@ class WalletServiceDemoViewModel(
     }
 
     /**
-     * Send a 0 ALGO payment from a seed's account to itself on TestNet. The SDK builds the unsigned
-     * transaction, the vault signs it over signTransaction, and the SDK submits it.
+     * Send a 0 ALGO payment from one of a seed's addresses to itself on TestNet. The SDK builds the
+     * unsigned transaction, the vault signs it over signTransaction, and the SDK submits it. Approval
+     * works as in [signDemoMessage].
      */
-    fun sendZeroAlgoPayment(seed: SeedVaultSeed) {
+    fun sendZeroAlgoPayment(
+        seed: SeedVaultSeed,
+        address: String,
+    ) {
+        val sender = "${seed.name} (${seed.addressLabel(address)})"
+        val onError = { e: Exception ->
+            Log.e("WalletServiceDemo", "Algorand payment failed", e)
+            _uiState.update { it.copy(errorMessage = "Algorand payment failed: ${e.message}", loading = false) }
+        }
         _uiState.update {
             it.copy(loading = true, errorMessage = null, algorandPaymentResult = null, algorandPaymentTxId = null)
         }
 
         viewModelScope.launch {
-            try {
-                val payment = algorandPaymentClient.preparePayment(seed.address, seed.address, 0L)
-                requestConfirmation(payment.confirmationIntent) {
-                    signAndSendPayment(seed) { algorandPaymentClient.signAndSend(payment) }
+            val payment =
+                try {
+                    algorandPaymentClient.preparePayment(address, address, 0L)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    onError(e)
+                    return@launch
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("WalletServiceDemo", "Algorand payment failed", e)
-                _uiState.update {
-                    it.copy(errorMessage = "Algorand payment failed: ${e.message}", loading = false)
-                }
-            }
+            signWithApproval(
+                autosign = seed.signsWithoutApproval(address),
+                confirmationIntent = { payment.confirmationIntent },
+                sign = { algorandPaymentClient.signAndSend(payment) },
+                onSigned = { txId ->
+                    _uiState.update {
+                        it.copy(
+                            algorandPaymentResult = "$sender sent a 0 ALGO payment to itself",
+                            algorandPaymentTxId = txId,
+                            loading = false,
+                        )
+                    }
+                    refreshAlgorandBalances()
+                },
+                onError = onError,
+            )
         }
     }
 
-    private fun signAndSendPayment(
-        seed: SeedVaultSeed,
-        sendPayment: suspend () -> String,
+    /**
+     * Runs [sign] once the vault will accept it. With [autosign] it signs right away; if the vault
+     * still wants an approval (autosign was turned off since the seeds were fetched), it falls back to
+     * the confirm sign screen. Without [autosign] the user approves first.
+     */
+    private fun <T> signWithApproval(
+        autosign: Boolean,
+        confirmationIntent: () -> Intent,
+        sign: suspend () -> T,
+        onSigned: (T) -> Unit,
+        onError: (Exception) -> Unit,
     ) {
-        _uiState.update { it.copy(loading = true, errorMessage = null) }
-        viewModelScope.launch {
-            try {
-                val txId = sendPayment()
-                _uiState.update {
-                    it.copy(
-                        algorandPaymentResult = "${seed.name} sent a 0 ALGO payment to itself",
-                        algorandPaymentTxId = txId,
-                        loading = false,
-                    )
-                }
-                refreshAlgorandBalances()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("WalletServiceDemo", "Algorand payment failed", e)
-                _uiState.update {
-                    it.copy(errorMessage = "Algorand payment failed: ${e.message}", loading = false)
+        fun signNow(fallBackToApproval: Boolean) {
+            _uiState.update { it.copy(loading = true, errorMessage = null) }
+            viewModelScope.launch {
+                try {
+                    onSigned(sign())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: SecurityException) {
+                    if (fallBackToApproval) {
+                        Log.i("WalletServiceDemo", "Autosign refused, asking for approval", e)
+                        requestConfirmation(confirmationIntent()) { signNow(fallBackToApproval = false) }
+                    } else {
+                        onError(e)
+                    }
+                } catch (e: Exception) {
+                    onError(e)
                 }
             }
+        }
+
+        if (autosign) {
+            signNow(fallBackToApproval = true)
+        } else {
+            requestConfirmation(confirmationIntent()) { signNow(fallBackToApproval = false) }
         }
     }
 
@@ -757,6 +796,19 @@ class WalletServiceDemoViewModel(
     companion object {
         private const val SIGN_DEMO_MESSAGE = "Hello from serviceDemoApp"
     }
+}
+
+/**
+ * Whether to try signing with [address] of this seed without the confirm sign screen first. True for
+ * an autosign account whatever [SeedVaultAccount.requiresApproval] says: that is only a snapshot from
+ * the last fetch, and the vault decides on every call. If it refuses, the demo asks for approval.
+ */
+fun SeedVaultSeed.signsWithoutApproval(address: String): Boolean = account(address)?.isAutosign == true
+
+/** Short name of one of this seed's accounts, for results and buttons, e.g. "autosign, index 1". */
+fun SeedVaultSeed.addressLabel(address: String): String {
+    val account = account(address) ?: return address
+    return if (account.isAutosign) "autosign, index ${account.index}" else "index ${account.index}"
 }
 
 /**
