@@ -198,14 +198,14 @@ private fun CheckCircle(checked: Boolean) {
             Icon(
                 painter = painterResource(R.drawable.ic_check),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.background,
+                tint = MaterialTheme.colorScheme.onTertiary,
                 modifier = Modifier.size(18.dp),
             )
         }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D1615)
+@Preview(showBackground = true, backgroundColor = 0xFF001423)
 @Composable
 private fun RevealSeedPhraseScreenPreview() {
     SeedVaultTheme {

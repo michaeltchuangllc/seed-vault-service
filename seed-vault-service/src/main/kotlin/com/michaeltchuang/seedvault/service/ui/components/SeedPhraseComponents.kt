@@ -59,7 +59,7 @@ fun SeedPhraseGrid(
 ) {
     if (words.isEmpty()) {
         Box(modifier = modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.tertiary)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
         }
         return
     }
@@ -97,7 +97,7 @@ private fun SeedWord(
             text = "${index + 1}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.width(24.dp),
         )
         Text(
@@ -136,7 +136,7 @@ fun SeedPhraseWarning(
 }
 
 /**
- * Icon in a round chip with a teal glow behind it, the hero of the seed phrase screens.
+ * Icon in a round chip with a blue glow behind it, the hero of the seed phrase screens.
  */
 @Composable
 fun GlowingIcon(
@@ -164,14 +164,14 @@ fun GlowingIcon(
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(40.dp),
             )
         }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D1615)
+@Preview(showBackground = true, backgroundColor = 0xFF001423)
 @Composable
 private fun SeedPhraseGridPreview() {
     SeedVaultTheme {

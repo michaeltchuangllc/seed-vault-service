@@ -161,7 +161,7 @@ private fun SeedPhraseSection(
     )
     SettingsRow(
         iconRes = if (seed.isBackedUp) R.drawable.ic_check_circle else R.drawable.ic_error,
-        iconTint = if (seed.isBackedUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+        iconTint = if (seed.isBackedUp) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
         title = stringResource(R.string.backup),
         subtitle = stringResource(if (seed.isBackedUp) R.string.backup_done else R.string.backup_none),
         onClick = onBackupClick,
@@ -282,7 +282,7 @@ private fun RenameSeedDialog(
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D1615)
+@Preview(showBackground = true, backgroundColor = 0xFF001423)
 @Composable
 private fun SeedDetailsScreenPreview() {
     SeedVaultTheme {

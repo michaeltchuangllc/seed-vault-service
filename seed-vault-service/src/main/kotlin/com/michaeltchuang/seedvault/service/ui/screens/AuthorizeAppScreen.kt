@@ -170,7 +170,7 @@ private fun SeedChoiceRow(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D1615)
+@Preview(showBackground = true, backgroundColor = 0xFF001423)
 @Composable
 private fun AuthorizeAppScreenPreview() {
     SeedVaultTheme {

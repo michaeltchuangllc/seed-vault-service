@@ -144,7 +144,7 @@ fun SeedVaultPrimaryButton(
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onTertiary,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 disabledContentColor = MaterialTheme.colorScheme.outline,
             ),

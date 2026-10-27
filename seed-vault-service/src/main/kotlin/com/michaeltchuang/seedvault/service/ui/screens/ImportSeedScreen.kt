@@ -190,7 +190,7 @@ private fun SeedWordField(
             text = "${index + 1}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.width(24.dp),
         )
         BasicTextField(
@@ -203,7 +203,7 @@ private fun SeedWordField(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,
                 ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.tertiary),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
             // Password keyboard turns off suggestions and keeps the words out of the keyboard's dictionary
             keyboardOptions =
                 KeyboardOptions(
@@ -219,7 +219,7 @@ private fun SeedWordField(
 
 private const val LAST_WORD_INDEX = 24
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D1615)
+@Preview(showBackground = true, backgroundColor = 0xFF001423)
 @Composable
 private fun ImportSeedScreenPreview() {
     SeedVaultTheme {
