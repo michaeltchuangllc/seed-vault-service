@@ -221,7 +221,7 @@ private fun SeedNameCard(
     }
 }
 
-/** The accounts of the seed, all signed for by its one key. Selectable, so they can be copied. */
+/** The accounts of the seed, each with its own key. Selectable, so they can be copied. */
 @Composable
 private fun SeedAddressesCard(seed: VaultSeed) {
     Surface(

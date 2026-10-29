@@ -9,6 +9,8 @@ import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,7 +37,29 @@ class RoomSeedKeyVaultTest {
 
             assertEquals(listOf(HUMAN_SIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS_INDEX), seed.accounts.map { it.index })
             assertEquals(listOf("ADDRESS0", "ADDRESS1"), seed.accounts.map { it.address })
-            seed.accounts.forEach { assertArrayEquals(PUBLIC_KEY, it.publicKey) }
+            seed.accounts.forEach { assertArrayEquals(PUBLIC_KEYS.getValue(it.index), it.publicKey) }
+        }
+
+    @Test
+    fun theTwoAccountsHaveDifferentKeys() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+
+            val human = seed.account(HUMAN_SIGN_ADDRESS_INDEX)
+            val autosign = seed.account(AUTOSIGN_ADDRESS_INDEX)
+            assertFalse(human.publicKey.contentEquals(autosign.publicKey))
+            assertNotEquals(human.address, autosign.address)
+        }
+
+    @Test
+    fun theAutosignKeyCannotReadTheHumanSignKey() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+            // Only the user auth cipher reads what is stored for the human sign account
+            val stolen = seed.account(HUMAN_SIGN_ADDRESS_INDEX)
+
+            assertFailsWith<IllegalArgumentException> { autosignCipher.decrypt(stolen.encryptedPrivateKey) }
+            assertFailsWith<IllegalArgumentException> { autosignCipher.decrypt(seed.encryptedEntropy) }
         }
 
     @Test
@@ -46,7 +70,7 @@ class RoomSeedKeyVaultTest {
 
             val signature = vault.signBytes(seed, AUTOSIGN_ADDRESS_INDEX, DATA)
 
-            assertArrayEquals(DATA.reversedArray(), signature)
+            assertArrayEquals(PRIVATE_KEYS.getValue(AUTOSIGN_ADDRESS_INDEX) + DATA, signature)
         }
 
     @Test
@@ -59,7 +83,7 @@ class RoomSeedKeyVaultTest {
             assertFailsWith<IllegalStateException> { vault.signTransaction(seed, HUMAN_SIGN_ADDRESS_INDEX, DATA) }
 
             userAuthCipher.locked = false
-            assertArrayEquals(DATA.reversedArray(), vault.signBytes(seed, HUMAN_SIGN_ADDRESS_INDEX, DATA))
+            assertArrayEquals(PRIVATE_KEYS.getValue(HUMAN_SIGN_ADDRESS_INDEX) + DATA, vault.signBytes(seed, HUMAN_SIGN_ADDRESS_INDEX, DATA))
         }
 
     @Test
@@ -94,7 +118,13 @@ class RoomSeedKeyVaultTest {
             val seed = vault.addSeed(SEED_PHRASE)
             // The autosign copy is not readable with the user auth key, and the other way round
             val swapped =
-                StoredAccount(AUTOSIGN_ADDRESS_INDEX, "ADDRESS1", 1, PUBLIC_KEY, seed.account(HUMAN_SIGN_ADDRESS_INDEX).encryptedPrivateKey)
+                StoredAccount(
+                    AUTOSIGN_ADDRESS_INDEX,
+                    "ADDRESS1",
+                    1,
+                    PUBLIC_KEYS.getValue(AUTOSIGN_ADDRESS_INDEX),
+                    seed.account(HUMAN_SIGN_ADDRESS_INDEX).encryptedPrivateKey,
+                )
 
             assertFailsWith<IllegalArgumentException> {
                 vault.signBytes(StoredSeed(seed.encryptedEntropy, listOf(swapped)), AUTOSIGN_ADDRESS_INDEX, DATA)
@@ -117,21 +147,21 @@ class RoomSeedKeyVaultTest {
             return SEED_PHRASE
         }
 
-        override fun keyPairFromEntropy(entropy: ByteArray) = FalconKeyPair(PUBLIC_KEY, PRIVATE_KEY.copyOf().also(privateKeys::add))
+        override fun keyPairAt(
+            entropy: ByteArray,
+            addressIndex: Int,
+        ) = FalconKeyPair(PUBLIC_KEYS.getValue(addressIndex), PRIVATE_KEYS.getValue(addressIndex).copyOf().also(privateKeys::add))
 
-        override fun accounts(publicKey: ByteArray) =
-            listOf(HUMAN_SIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS_INDEX).map {
-                StoredAccount(it, "ADDRESS$it", it, publicKey, ByteArray(0))
-            }
+        override fun account(
+            addressIndex: Int,
+            publicKey: ByteArray,
+        ) = StoredAccount(addressIndex, "ADDRESS$addressIndex", 0, publicKey, ByteArray(0))
 
+        /** The "signature" is the private key then the data, so a test sees which key signed. */
         override fun signBytes(
             privateKey: ByteArray,
             data: ByteArray,
-        ): ByteArray {
-            assertArrayEquals(PRIVATE_KEY, privateKey)
-            privateKeys += privateKey
-            return data.reversedArray()
-        }
+        ): ByteArray = privateKey.copyOf() + data
 
         override fun signTransaction(
             publicKey: ByteArray,
@@ -144,8 +174,8 @@ class RoomSeedKeyVaultTest {
     private companion object {
         val SEED_PHRASE = List(25) { "word$it" }
         val ENTROPY = ByteArray(32) { 7 }
-        val PRIVATE_KEY = ByteArray(16) { 9 }
-        val PUBLIC_KEY = ByteArray(16) { 3 }
+        val PRIVATE_KEYS = mapOf(HUMAN_SIGN_ADDRESS_INDEX to ByteArray(16) { 9 }, AUTOSIGN_ADDRESS_INDEX to ByteArray(16) { 8 })
+        val PUBLIC_KEYS = mapOf(HUMAN_SIGN_ADDRESS_INDEX to ByteArray(16) { 3 }, AUTOSIGN_ADDRESS_INDEX to ByteArray(16) { 4 })
         val DATA = byteArrayOf(1, 2, 3)
     }
 }

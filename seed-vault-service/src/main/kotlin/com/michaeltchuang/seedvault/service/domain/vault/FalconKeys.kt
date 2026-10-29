@@ -6,11 +6,17 @@ internal interface FalconKeys {
 
     fun seedPhraseFromEntropy(entropy: ByteArray): List<String>
 
-    /** The key pair behind [entropy]. */
-    fun keyPairFromEntropy(entropy: ByteArray): FalconKeyPair
+    /** The key pair of the account at [addressIndex] of the seed with [entropy]. Every index has its own. */
+    fun keyPairAt(
+        entropy: ByteArray,
+        addressIndex: Int,
+    ): FalconKeyPair
 
-    /** An account at every address index for [publicKey], with no private key stored. */
-    fun accounts(publicKey: ByteArray): List<StoredAccount>
+    /** The account at [addressIndex] for its key pair's [publicKey], with no private key stored. */
+    fun account(
+        addressIndex: Int,
+        publicKey: ByteArray,
+    ): StoredAccount
 
     fun signBytes(
         privateKey: ByteArray,

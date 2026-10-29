@@ -1,6 +1,7 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES
 import com.michaeltchuang.seedvault.service.domain.vault.FalconKeys
 import com.michaeltchuang.seedvault.service.domain.vault.SecretCipher
 import com.michaeltchuang.seedvault.service.domain.vault.SeedKeyVault
@@ -10,13 +11,12 @@ import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 
 /**
  * Keeps the entropy behind each seed phrase (in the seed row) and the Falcon-1024 private key of
- * each account (in its account row) encrypted with StrongBox / TEE Keystore keys. [cipher] needs a
- * fresh user verification, so revealing a seed and signing as the human sign account fail unless the
- * user just verified themselves. [autosignCipher] does not, for the autosign account. Both accounts
- * share one Falcon key, so code inside this app could sign as either: the verification only holds
- * for the human sign account against anything that cannot use the autosign copy. Used when the
- * device has no Trusty applet, which gates each index inside the TEE. The keys are derived and used
- * with the algokit-core Rust FFI ([NativeFalconKeys]).
+ * each account (in its account row) encrypted with StrongBox / TEE Keystore keys. Every address index
+ * has its own Falcon key pair. [cipher] needs a fresh user verification, so revealing a seed and
+ * signing as the human sign account fail unless the user just verified themselves. [autosignCipher]
+ * does not, and only protects the autosign account's key, which cannot sign for the human sign
+ * account. Used when the device has no Trusty applet. The keys are derived and used with the
+ * algokit-core Rust FFI ([NativeFalconKeys]).
  */
 internal class RoomSeedKeyVault(
     private val cipher: SecretCipher,
@@ -30,24 +30,18 @@ internal class RoomSeedKeyVault(
     override suspend fun addSeed(seedPhrase: List<String>): StoredSeed {
         val entropy = falcon.entropyFromSeedPhrase(seedPhrase)
         try {
-            val account = falcon.keyPairFromEntropy(entropy)
-            try {
-                return StoredSeed(
-                    encryptedEntropy = cipher.encrypt(entropy),
-                    accounts =
-                        falcon.accounts(account.publicKey).map {
-                            StoredAccount(
-                                index = it.index,
-                                address = it.address,
-                                salt = it.salt,
-                                publicKey = it.publicKey,
-                                encryptedPrivateKey = cipherFor(it.index).encrypt(account.privateKey),
-                            )
-                        },
-                )
-            } finally {
-                account.privateKey.fill(0)
-            }
+            return StoredSeed(
+                encryptedEntropy = cipher.encrypt(entropy),
+                accounts =
+                    SEED_ADDRESS_INDEXES.map { index ->
+                        val keyPair = falcon.keyPairAt(entropy, index)
+                        try {
+                            falcon.account(index, keyPair.publicKey).withPrivateKey(cipherFor(index).encrypt(keyPair.privateKey))
+                        } finally {
+                            keyPair.privateKey.fill(0)
+                        }
+                    },
+            )
         } finally {
             entropy.fill(0)
         }
@@ -93,6 +87,9 @@ internal class RoomSeedKeyVault(
             privateKey.fill(0)
         }
     }
+
+    private fun StoredAccount.withPrivateKey(encryptedPrivateKey: ByteArray) =
+        StoredAccount(index, address, salt, publicKey, encryptedPrivateKey)
 
     private fun cipherFor(addressIndex: Int) = if (addressIndex == AUTOSIGN_ADDRESS_INDEX) autosignCipher else cipher
 }

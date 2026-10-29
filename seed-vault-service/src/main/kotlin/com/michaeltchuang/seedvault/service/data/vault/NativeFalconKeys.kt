@@ -9,12 +9,18 @@ internal object NativeFalconKeys : FalconKeys {
 
     override fun seedPhraseFromEntropy(entropy: ByteArray) = Falcon1024.seedPhraseFromEntropy(entropy)
 
-    override fun keyPairFromEntropy(entropy: ByteArray): FalconKeyPair {
-        val account = Falcon1024.accountFromEntropy(entropy)
+    override fun keyPairAt(
+        entropy: ByteArray,
+        addressIndex: Int,
+    ): FalconKeyPair {
+        val account = Falcon1024.accountAt(entropy, addressIndex)
         return FalconKeyPair(account.publicKey, account.privateKey)
     }
 
-    override fun accounts(publicKey: ByteArray) = Falcon1024.accounts(publicKey, encryptedPrivateKey = ByteArray(0))
+    override fun account(
+        addressIndex: Int,
+        publicKey: ByteArray,
+    ) = Falcon1024.account(addressIndex, publicKey, encryptedPrivateKey = ByteArray(0))
 
     override fun signBytes(
         privateKey: ByteArray,
