@@ -2,7 +2,10 @@ package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
-import com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES
+import com.michaeltchuang.seedvault.service.domain.vault.SeedKeyVault
+import com.michaeltchuang.seedvault.service.domain.vault.SeedStorage
+import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
+import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import uniffi.seed_vault_ffi.AppletErrorCode
 import uniffi.seed_vault_ffi.KeyAlgorithm
 import uniffi.seed_vault_ffi.ListedAccount
@@ -18,20 +21,20 @@ import uniffi.seed_vault_ffi.humanSignIndex
  * The private keys never leave the TEE, so the database only holds the accounts and their public
  * keys. It is only available on devices that have the applet and let this app talk to it.
  *
- * The applet keeps one account per seed and address index: the human sign index needs the user to
- * approve each signature in the TEE, the autosign index does not. Every seed is imported at both,
- * and each account keeps the public key the applet reports for it.
+ * The applet keeps one account per seed and address index, each with its own key pair: the human sign
+ * index needs the user to approve each signature in the TEE, the autosign index does not. The seed is
+ * imported once, at the human sign index, which is the account other wallets restore from the 25
+ * words. The autosign account is then added with `deriveAccount`, a separate key derived by the
+ * applet from the same seed. Each account keeps the public key the applet reports for it.
  *
  * @param clientFactory creates the client lazily, it loads a native library
  * @param appletIndexProvider the applet's address index for one of ours, read lazily for the same reason
- * @param publicKeyOf derives the public key of a seed phrase, only for a phrase the applet already has
- * @param accountsOf the accounts of a public key, to check the applet made the same addresses
+ * @param humanAddressOf the human sign address of a seed phrase, to check the applet made the same one
  */
 internal class TrustySeedKeyVault(
     clientFactory: () -> SeedVaultClientInterface = { SeedVaultClient() },
     private val appletIndexProvider: (Int) -> UByte = ::appletIndex,
-    private val publicKeyOf: (List<String>) -> ByteArray = ::derivePublicKey,
-    private val accountsOf: (ByteArray) -> List<StoredAccount> = { Falcon1024.accounts(it, encryptedPrivateKey = ByteArray(0)) },
+    private val humanAddressOf: (List<String>) -> String = ::deriveHumanAddress,
 ) : SeedKeyVault {
     override val storage = SeedStorage.TRUSTY
 
@@ -44,28 +47,25 @@ internal class TrustySeedKeyVault(
     override suspend fun isAvailable(): Boolean = runCatching { client.status() is SeedVaultStatus.Available }.getOrDefault(false)
 
     override suspend fun addSeed(seedPhrase: List<String>): StoredSeed {
-        val mnemonic = seedPhrase.joinToString(" ")
-        val imported =
-            SEED_ADDRESS_INDEXES.mapNotNull { index ->
-                try {
-                    client.importAccount(mnemonic, KeyAlgorithm.FALCON1024, appletIndexProvider(index)).address
-                } catch (e: SeedVaultException.Applet) {
-                    // The TEE keeps its accounts when the app's data is cleared, so the phrase may be there already
-                    if (e.code != AppletErrorCode.ACCOUNT_ALREADY_EXISTS) throw e
-                    null
-                }
-            }
-        // Only a phrase the applet already had at every index needs the key derived here
-        val publicKey = imported.firstOrNull()?.let { listAccount(it).publicKey } ?: publicKeyOf(seedPhrase)
-        // The applet must hold every account, which also checks it derived the same addresses
+        val humanAddress = humanAddressOf(seedPhrase)
+        try {
+            val imported =
+                client.importAccount(seedPhrase.joinToString(" "), KeyAlgorithm.FALCON1024, appletIndexProvider(HUMAN_SIGN_ADDRESS_INDEX))
+            check(imported.address == humanAddress) { "The Trusty applet made another address than the seed phrase has" }
+        } catch (e: SeedVaultException.Applet) {
+            // The TEE keeps its accounts when the app's data is cleared, so the phrase may be there already
+            if (e.code != AppletErrorCode.ACCOUNT_ALREADY_EXISTS) throw e
+        }
+        // Adds the autosign key, or returns it when the seed already has it. Needs applet protocol 1.2
+        val autosign = client.deriveAccount(humanAddress, appletIndexProvider(AUTOSIGN_ADDRESS_INDEX))
         val accounts =
-            accountsOf(publicKey).map { derived ->
-                val listed = listAccount(derived.address)
+            listOf(HUMAN_SIGN_ADDRESS_INDEX to humanAddress, AUTOSIGN_ADDRESS_INDEX to autosign.address).map { (index, address) ->
                 StoredAccount(
-                    index = derived.index,
-                    address = derived.address,
-                    salt = derived.salt,
-                    publicKey = listed.publicKey,
+                    index = index,
+                    address = address,
+                    // The applet adds the salt when it signs
+                    salt = 0,
+                    publicKey = listAccount(address).publicKey,
                     encryptedPrivateKey = ByteArray(0),
                 )
             }
@@ -101,15 +101,13 @@ internal class TrustySeedKeyVault(
         return client.signTransaction(listed.account.address, listed.account.addressIndex.toUByte(), transaction).signedTxn
     }
 
-    /** Removes the account at every index. One that is already gone is skipped, so a failed delete can be tried again. */
+    /** Removes the seed, which takes its autosign account along. One that is already gone is skipped, so a failed delete can be tried again. */
     override suspend fun deleteSeed(seed: StoredSeed) {
-        seed.accounts.forEach { account ->
-            try {
-                client.deleteAccount(account.address)
-            } catch (e: SeedVaultException.Applet) {
-                // Already gone, which is what was asked for
-                if (e.code != AppletErrorCode.ACCOUNT_NOT_FOUND) throw e
-            }
+        try {
+            client.deleteAccount(seed.account(HUMAN_SIGN_ADDRESS_INDEX).address)
+        } catch (e: SeedVaultException.Applet) {
+            // Already gone, which is what was asked for
+            if (e.code != AppletErrorCode.ACCOUNT_NOT_FOUND) throw e
         }
     }
 
@@ -125,12 +123,12 @@ internal class TrustySeedKeyVault(
                 else -> throw IllegalArgumentException("The Trusty applet has no address index $index")
             }
 
-        fun derivePublicKey(seedPhrase: List<String>): ByteArray {
+        fun deriveHumanAddress(seedPhrase: List<String>): String {
             val entropy = Falcon1024.entropyFromSeedPhrase(seedPhrase)
             try {
                 val account = Falcon1024.accountFromEntropy(entropy)
                 account.privateKey.fill(0)
-                return account.publicKey
+                return Falcon1024.account(HUMAN_SIGN_ADDRESS_INDEX, account.publicKey, encryptedPrivateKey = ByteArray(0)).address
             } finally {
                 entropy.fill(0)
             }

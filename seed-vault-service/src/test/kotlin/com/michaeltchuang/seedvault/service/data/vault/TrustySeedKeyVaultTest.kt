@@ -2,6 +2,8 @@ package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
+import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -22,19 +24,11 @@ import uniffi.seed_vault_ffi.SignedTransaction
 
 class TrustySeedKeyVaultTest {
     private val applet = FakeApplet()
-    private var derivedPublicKeys = 0
     private val vault =
         TrustySeedKeyVault(
             clientFactory = { applet },
             appletIndexProvider = { APPLET_INDEXES.getValue(it) },
-            publicKeyOf = {
-                derivedPublicKeys++
-                PUBLIC_KEY
-            },
-            accountsOf = { publicKey ->
-                assertArrayEquals(PUBLIC_KEY, publicKey)
-                STORED_ACCOUNTS
-            },
+            humanAddressOf = { HUMAN_ADDRESS },
         )
     private val seedPhrase = List(25) { "word$it" }
 
@@ -65,35 +59,43 @@ class TrustySeedKeyVaultTest {
         }
 
     @Test
-    fun addSeedImportsTheHumanSignAndAutosignAccountsAndKeepsOnlyPublicValues() =
+    fun addSeedImportsTheHumanSignAccountAndDerivesTheAutosignOne() =
         runTest {
             val stored = vault.addSeed(seedPhrase)
 
-            assertEquals(listOf(seedPhrase.joinToString(" ")), applet.importedMnemonics.distinct())
+            assertEquals(listOf(seedPhrase.joinToString(" ")), applet.importedMnemonics)
             assertEquals(KeyAlgorithm.FALCON1024, applet.importedAlgorithm)
-            assertEquals(listOf(HUMAN_SIGN_APPLET_INDEX, AUTOSIGN_APPLET_INDEX), applet.importedIndexes)
+            assertEquals(listOf(HUMAN_SIGN_APPLET_INDEX), applet.importedIndexes)
+            assertEquals(listOf(HUMAN_ADDRESS to AUTOSIGN_APPLET_INDEX), applet.derived)
             assertEquals(listOf(HUMAN_ADDRESS, AUTOSIGN_ADDRESS), stored.accounts.map { it.address })
-            stored.accounts.forEach { assertArrayEquals(PUBLIC_KEY, it.publicKey) }
-            assertEquals(0, stored.encryptedEntropy.size)
-            assertTrue(stored.accounts.all { it.encryptedPrivateKey.isEmpty() })
-            assertEquals(0, derivedPublicKeys)
         }
 
     @Test
-    fun addSeedDerivesThePublicKeyWhenTheAppletAlreadyHasEveryAccount() =
+    fun addSeedKeepsOnlyPublicValuesAndEachAccountsOwnPublicKey() =
+        runTest {
+            val stored = vault.addSeed(seedPhrase)
+
+            assertArrayEquals(HUMAN_PUBLIC_KEY, stored.account(HUMAN_SIGN_ADDRESS_INDEX).publicKey)
+            assertArrayEquals(AUTOSIGN_PUBLIC_KEY, stored.account(AUTOSIGN_ADDRESS_INDEX).publicKey)
+            assertEquals(0, stored.encryptedEntropy.size)
+            assertTrue(stored.accounts.all { it.encryptedPrivateKey.isEmpty() })
+        }
+
+    @Test
+    fun addSeedStillAddsTheAutosignAccountWhenTheAppletAlreadyHasTheSeed() =
         runTest {
             applet.importError = SeedVaultException.Applet(AppletErrorCode.ACCOUNT_ALREADY_EXISTS)
 
             val stored = vault.addSeed(seedPhrase)
 
-            assertEquals(1, derivedPublicKeys)
+            assertEquals(listOf(HUMAN_ADDRESS to AUTOSIGN_APPLET_INDEX), applet.derived)
             assertEquals(listOf(HUMAN_ADDRESS, AUTOSIGN_ADDRESS), stored.accounts.map { it.address })
         }
 
     @Test
     fun addSeedFailsWhenTheAppletMadeOtherAddresses() =
         runTest {
-            applet.accounts[1] = Account(KeyAlgorithm.FALCON1024, AUTOSIGN_APPLET_INDEX.toUInt(), "SOMEOTHERADDRESS")
+            applet.accounts[0] = Account(KeyAlgorithm.FALCON1024, HUMAN_SIGN_APPLET_INDEX.toUInt(), "SOMEOTHERADDRESS")
 
             assertThrows(IllegalStateException::class.java) {
                 kotlinx.coroutines.runBlocking { vault.addSeed(seedPhrase) }
@@ -150,11 +152,12 @@ class TrustySeedKeyVaultTest {
         }
 
     @Test
-    fun deleteSeedRemovesEveryAccount() =
+    fun deleteSeedRemovesTheSeedByItsHumanSignAddress() =
         runTest {
             vault.deleteSeed(storedSeed())
 
-            assertEquals(listOf(HUMAN_ADDRESS, AUTOSIGN_ADDRESS), applet.deleted)
+            // The applet removes the autosign account with it, and refuses to delete one by its address
+            assertEquals(listOf(HUMAN_ADDRESS), applet.deleted)
         }
 
     @Test
@@ -176,7 +179,7 @@ class TrustySeedKeyVaultTest {
         }
 
     private class FakeApplet : SeedVaultClientInterface {
-        var status: SeedVaultStatus = SeedVaultStatus.Available(ProtocolVersion(1u, 0u))
+        var status: SeedVaultStatus = SeedVaultStatus.Available(ProtocolVersion(1u, 2u))
         var mnemonic = ""
         var importError: SeedVaultException? = null
         var deleteError: SeedVaultException? = null
@@ -187,6 +190,7 @@ class TrustySeedKeyVaultTest {
         var importedAlgorithm: KeyAlgorithm? = null
         val importedIndexes = mutableListOf<UByte>()
         val deleted = mutableListOf<String>()
+        val derived = mutableListOf<Pair<String, UByte>>()
 
         val accounts =
             mutableListOf(
@@ -212,7 +216,27 @@ class TrustySeedKeyVaultTest {
             return accountAt(addressIndex)
         }
 
-        override fun listAccounts() = accounts.map { ListedAccount(it, PUBLIC_KEY) }
+        override fun deriveAccount(
+            address: String,
+            addressIndex: UByte,
+        ): Account {
+            derived += address to addressIndex
+            return accountAt(addressIndex)
+        }
+
+        override fun listAccounts() =
+            accounts.map {
+                ListedAccount(
+                    it,
+                    if (it.address ==
+                        HUMAN_ADDRESS
+                    ) {
+                        HUMAN_PUBLIC_KEY
+                    } else {
+                        AUTOSIGN_PUBLIC_KEY
+                    },
+                )
+            }
 
         override fun revealMnemonic(address: String) = mnemonic
 
@@ -258,7 +282,8 @@ class TrustySeedKeyVaultTest {
     private companion object {
         const val HUMAN_ADDRESS = "FALCONHUMANADDRESS"
         const val AUTOSIGN_ADDRESS = "FALCONAUTOSIGNADDRESS"
-        val PUBLIC_KEY = byteArrayOf(1, 2, 3)
+        val HUMAN_PUBLIC_KEY = byteArrayOf(1, 2, 3)
+        val AUTOSIGN_PUBLIC_KEY = byteArrayOf(4, 5, 6)
 
         // Not our indexes on purpose, to show the vault asks the applet for its own
         const val HUMAN_SIGN_APPLET_INDEX: UByte = 7u
@@ -267,8 +292,8 @@ class TrustySeedKeyVaultTest {
 
         val STORED_ACCOUNTS =
             listOf(
-                StoredAccount(HUMAN_SIGN_ADDRESS_INDEX, HUMAN_ADDRESS, salt = 0, PUBLIC_KEY, encryptedPrivateKey = ByteArray(0)),
-                StoredAccount(AUTOSIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS, salt = 3, PUBLIC_KEY, encryptedPrivateKey = ByteArray(0)),
+                StoredAccount(HUMAN_SIGN_ADDRESS_INDEX, HUMAN_ADDRESS, salt = 0, HUMAN_PUBLIC_KEY, encryptedPrivateKey = ByteArray(0)),
+                StoredAccount(AUTOSIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS, salt = 0, AUTOSIGN_PUBLIC_KEY, encryptedPrivateKey = ByteArray(0)),
             )
     }
 }

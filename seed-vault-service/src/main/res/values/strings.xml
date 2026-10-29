@@ -79,6 +79,7 @@
     <string name="auth_unavailable">Set up a fingerprint or screen lock on this device to continue.</string>
     <string name="reveal_auth_title">Verify it\'s you</string>
     <string name="authorize_auth_title">Allow %1$s</string>
+    <string name="save_seed_auth_title">Save seed</string>
     <string name="confirm_sign_auth_title">Approve signature</string>
     <string name="confirm_sign_title">%1$s wants a signature</string>
     <string name="confirm_sign_seed">Seed: %1$s</string>

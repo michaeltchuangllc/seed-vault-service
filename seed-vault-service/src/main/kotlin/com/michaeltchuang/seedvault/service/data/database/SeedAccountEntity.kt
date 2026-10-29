@@ -7,8 +7,8 @@ import androidx.room.Index
 
 /**
  * One account of a seed: its address, the PQ address salt behind it, and its Falcon-1024 key pair.
- * [addressIndex] n uses the nth-lowest PQ-compliant salt. Index 0 is the human sign account other
- * wallets restore, index 1 the autosign account. An address is unique, so the same seed phrase is
+ * Every [addressIndex] has its own key pair. Index 0 is the human sign account other wallets
+ * restore, index 1 the autosign account. An address is unique, so the same seed phrase is
  * only stored once.
  *
  * [publicKey] is not secret and is stored as is. [encryptedPrivateKey] is encrypted with the

@@ -7,7 +7,7 @@ package com.michaeltchuang.seedvault.service.domain.model
 const val HUMAN_SIGN_ADDRESS_INDEX = 0
 
 /**
- * Address index of the autosign account of a seed: the same key, next PQ-compliant salt. When the
+ * Address index of the autosign account of a seed: its own key pair, derived from the same seed. When the
  * user allows autosign, apps authorized for the seed can sign with it without asking. Same value as
  * the Trusty applet's `autosignIndex()`.
  */
@@ -16,7 +16,7 @@ const val AUTOSIGN_ADDRESS_INDEX = 1
 /** The address indexes every seed gets, in order. */
 val SEED_ADDRESS_INDEXES = listOf(HUMAN_SIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS_INDEX)
 
-/** One Falcon-1024 address of a seed. All accounts of a seed are authorized by its single key. */
+/** One Falcon-1024 address of a seed. Each account of a seed has its own key. */
 data class VaultAddress(
     val index: Int,
     val address: String,

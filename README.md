@@ -3,7 +3,7 @@ Companion Android service for the Seed Vault Trusty applet.
 
 ## Modules
 
-- **seed-vault-service**: Android Seed Vault app in the Solana Seed Vault style (settings, seed details, authorized apps). Generates and imports 25-word Falcon-1024 seed phrases, stores them in Room (encrypted with an Android Keystore key, or kept in the Trusty applet when available) and exposes a bound AIDL service to authorized apps.
+- **seed-vault-service**: Android Seed Vault app in the Solana Seed Vault style (settings, seed details, authorized apps). Generates and imports 25-word Falcon-1024 seed phrases, stores them in Room (encrypted with a StrongBox/TEE Android Keystore key that needs a fresh fingerprint or screen lock to use, or kept in the Trusty applet when available) and exposes a bound AIDL service to authorized apps.
 - **seed-vault-sdk**: UI-free Android client library for the Falcon-1024 Seed Vault service and the Solana Mobile Seed Vault, including AIDL, account access, networking and payment flows.
 - **seed-vault-demo-app**: Sample wallet that consumes `seed-vault-sdk` for its Algorand and Solana tabs.
 
@@ -19,7 +19,7 @@ These are checked in as local `.aar` files in `seed-vault-service/libs/` and ref
 
 `seed-vault-service` keeps its metadata in Room (`seed_vault.db`, schema version 1, exported to `seed-vault-service/schemas/`). Secrets are only in the database when the seed's `storage` is `ROOM`; for `TRUSTY` they stay in the TEE and the encrypted columns (`seed.encrypted_entropy`, `seed_account.encrypted_private_key`) are empty.
 
-`seed` holds the seed phrase entropy; each account in `seed_account` holds its own Falcon-1024 key pair, address and PQ address salt. Every seed has two accounts: index 0 is the human sign account (each signature needs the user's approval), index 1 is the autosign account (signs without a prompt while autosign is on in Security). Today both accounts of a seed hold the same key pair and differ only by salt, but keeping the keys per account lets an account have its own key later. Deleting a seed cascades to its accounts and authorized apps.
+`seed` holds the seed phrase entropy; each account in `seed_account` holds its own Falcon-1024 key pair, address and PQ address salt. Every seed has two accounts: index 0 is the human sign account (each signature needs the user's approval), index 1 is the autosign account (signs without a prompt while autosign is on in Security). The two accounts have different key pairs: index 0 is the key from the 25 words, which other wallets restore, and index 1 is a separate key derived from the same seed with SHA512/256("SeedVaultAutosign" || index || entropy), the applet's own derivation, so Trusty and other phones make the same addresses and index 1 cannot sign for index 0. Deleting a seed cascades to its accounts and authorized apps.
 
 ```mermaid
 erDiagram

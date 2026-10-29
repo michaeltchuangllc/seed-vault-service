@@ -40,6 +40,19 @@ fun interface SignBytes {
     ): ByteArray?
 }
 
+/** Signs an unsigned Algorand transaction and returns the signed transaction. */
+fun interface SignTransaction {
+    suspend operator fun invoke(
+        address: String,
+        transaction: ByteArray,
+    ): ByteArray?
+}
+
+/** The public key of one of a seed's accounts, or null if no seed has [address]. */
+fun interface GetPublicKey {
+    suspend operator fun invoke(address: String): ByteArray?
+}
+
 /** Lets an app request signatures from a seed. */
 fun interface AuthorizeApp {
     suspend operator fun invoke(
