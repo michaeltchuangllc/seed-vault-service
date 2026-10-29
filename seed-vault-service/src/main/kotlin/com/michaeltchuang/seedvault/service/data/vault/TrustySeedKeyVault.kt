@@ -3,6 +3,10 @@ package com.michaeltchuang.seedvault.service.data.vault
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES
+import com.michaeltchuang.seedvault.service.domain.vault.SeedKeyVault
+import com.michaeltchuang.seedvault.service.domain.vault.SeedStorage
+import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
+import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import uniffi.seed_vault_ffi.AppletErrorCode
 import uniffi.seed_vault_ffi.KeyAlgorithm
 import uniffi.seed_vault_ffi.ListedAccount

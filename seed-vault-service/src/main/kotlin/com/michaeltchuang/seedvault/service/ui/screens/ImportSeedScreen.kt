@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.michaeltchuang.seedvault.service.R
+import com.michaeltchuang.seedvault.service.ui.auth.rememberRequireAuth
 import com.michaeltchuang.seedvault.service.ui.components.SecureScreen
 import com.michaeltchuang.seedvault.service.ui.components.SeedPhraseWarning
 import com.michaeltchuang.seedvault.service.ui.components.SeedVaultBackButton
@@ -58,6 +59,8 @@ fun ImportSeedScreen(
     val viewState by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    // The Keystore key that encrypts the seed only works right after the user verified themselves
+    val requireAuth = rememberRequireAuth(title = stringResource(R.string.save_seed_auth_title))
 
     LaunchedEffect(Unit) {
         viewModel.viewEvent.collect { event ->
@@ -81,7 +84,7 @@ fun ImportSeedScreen(
         onBack = onBack,
         onWordChange = viewModel::onWordChange,
         onPaste = { clipboardManager.getText()?.text?.let(viewModel::onPaste) },
-        onImport = viewModel::onImport,
+        onImport = { requireAuth(viewModel::onImport) },
         modifier = modifier,
     )
 }

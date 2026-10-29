@@ -7,6 +7,7 @@ import com.michaeltchuang.seedvault.service.data.database.SeedVaultDatabase
 import com.michaeltchuang.seedvault.service.data.repository.SeedVaultRepositoryImpl
 import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
 import com.michaeltchuang.seedvault.service.data.settings.SharedPreferencesAutosignSettings
+import com.michaeltchuang.seedvault.service.data.vault.KeystoreSecretCipher
 import com.michaeltchuang.seedvault.service.data.vault.RoomSeedKeyVault
 import com.michaeltchuang.seedvault.service.data.vault.TrustySeedKeyVault
 import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
@@ -15,6 +16,7 @@ import com.michaeltchuang.seedvault.service.domain.usecase.AuthorizeApp
 import com.michaeltchuang.seedvault.service.domain.usecase.DeleteSeed
 import com.michaeltchuang.seedvault.service.domain.usecase.GenerateSeedPhrase
 import com.michaeltchuang.seedvault.service.domain.usecase.GenerateSeedPhraseUseCase
+import com.michaeltchuang.seedvault.service.domain.usecase.GetPublicKey
 import com.michaeltchuang.seedvault.service.domain.usecase.GetSeed
 import com.michaeltchuang.seedvault.service.domain.usecase.GetSeedPhrase
 import com.michaeltchuang.seedvault.service.domain.usecase.GetSeeds
@@ -23,6 +25,7 @@ import com.michaeltchuang.seedvault.service.domain.usecase.RenameSeedUseCase
 import com.michaeltchuang.seedvault.service.domain.usecase.RevokeAuthorizedApp
 import com.michaeltchuang.seedvault.service.domain.usecase.RevokeAuthorizedAppUseCase
 import com.michaeltchuang.seedvault.service.domain.usecase.SignBytes
+import com.michaeltchuang.seedvault.service.domain.usecase.SignTransaction
 import com.michaeltchuang.seedvault.service.domain.usecase.ValidateSeedPhrase
 import com.michaeltchuang.seedvault.service.domain.usecase.ValidateSeedPhraseUseCase
 import com.michaeltchuang.seedvault.service.remote.AlgokitTransactionDecoder
@@ -47,7 +50,12 @@ val seedVaultModule =
         // Data
         single { SeedVaultDatabase.build(androidContext()) }
         single { get<SeedVaultDatabase>().seedDao() }
-        single { RoomSeedKeyVault() }
+        single {
+            RoomSeedKeyVault(
+                cipher = KeystoreSecretCipher(KeystoreSecretCipher.USER_AUTH_KEY_ALIAS, requiresUserAuth = true),
+                autosignCipher = KeystoreSecretCipher(KeystoreSecretCipher.AUTOSIGN_KEY_ALIAS, requiresUserAuth = false),
+            )
+        }
         single { TrustySeedKeyVault() }
         single { UserAuthenticators(trusty = TrustyUserAuthenticator(), os = OsUserAuthenticator(androidContext())) }
         single<AutosignSettings> { SharedPreferencesAutosignSettings(androidContext()) }
@@ -65,6 +73,8 @@ val seedVaultModule =
         factory { GetSeedPhrase(get<SeedVaultRepository>()::getSeedPhrase) }
         factory { AuthorizeApp(get<SeedVaultRepository>()::authorizeApp) }
         factory { SignBytes(get<SeedVaultRepository>()::signBytes) }
+        factory { SignTransaction(get<SeedVaultRepository>()::signTransaction) }
+        factory { GetPublicKey(get<SeedVaultRepository>()::getPublicKey) }
         factory<RenameSeed> { RenameSeedUseCase(get()) }
         factory { DeleteSeed(get<SeedVaultRepository>()::deleteSeed) }
         factory<RevokeAuthorizedApp> { RevokeAuthorizedAppUseCase(get()) }

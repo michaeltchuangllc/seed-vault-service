@@ -3,7 +3,7 @@ package com.michaeltchuang.seedvault.service.data.database
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.michaeltchuang.seedvault.service.data.vault.SeedStorage
+import com.michaeltchuang.seedvault.service.domain.vault.SeedStorage
 
 /**
  * A seed in the vault. The Falcon-1024 entropy behind the 25-word seed phrase is stored encrypted

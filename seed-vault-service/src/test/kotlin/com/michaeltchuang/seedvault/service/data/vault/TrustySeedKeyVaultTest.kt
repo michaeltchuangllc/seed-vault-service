@@ -2,6 +2,8 @@ package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
+import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

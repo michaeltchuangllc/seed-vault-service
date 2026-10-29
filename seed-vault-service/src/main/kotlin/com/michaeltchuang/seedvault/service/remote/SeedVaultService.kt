@@ -10,7 +10,10 @@ import com.michaeltchuang.seedvault.service.ISeedVaultService
 import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
-import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepository
+import com.michaeltchuang.seedvault.service.domain.usecase.GetPublicKey
+import com.michaeltchuang.seedvault.service.domain.usecase.GetSeeds
+import com.michaeltchuang.seedvault.service.domain.usecase.SignBytes
+import com.michaeltchuang.seedvault.service.domain.usecase.SignTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -27,7 +30,10 @@ import org.koin.android.ext.android.inject
  * Signing with its autosign address does not while the user allows autosign, and does otherwise.
  */
 class SeedVaultService : Service() {
-    private val seedVaultRepository: SeedVaultRepository by inject()
+    private val getSeeds: GetSeeds by inject()
+    private val getPublicKey: GetPublicKey by inject()
+    private val signBytesUseCase: SignBytes by inject()
+    private val signTransactionUseCase: SignTransaction by inject()
     private val signApprovals: SignApprovalCoordinator by inject()
     private val transactionDecoder: TransactionDecoder by inject()
     private val autosignSettings: AutosignSettings by inject()
@@ -57,7 +63,7 @@ class SeedVaultService : Service() {
                 return runBlocking(Dispatchers.IO) {
                     val index = requireAuthorized(packages, address)
                     requireUserApproval(packages, index, SignOperation.bytes(address, data))
-                    seedVaultRepository.signBytes(address, data)
+                    signBytesUseCase(address, data)
                 }
             }
 
@@ -74,7 +80,7 @@ class SeedVaultService : Service() {
                 return runBlocking(Dispatchers.IO) {
                     val index = requireAuthorized(packages, address)
                     requireUserApproval(packages, index, SignOperation.transaction(address, transaction))
-                    seedVaultRepository.signTransaction(address, transaction)
+                    signTransactionUseCase(address, transaction)
                 }
             }
         }
@@ -118,8 +124,7 @@ class SeedVaultService : Service() {
     private fun requiresApproval(addressIndex: Int): Boolean = !(addressIndex == AUTOSIGN_ADDRESS_INDEX && autosignSettings.isEnabled.value)
 
     private suspend fun authorizedSeeds(packages: Set<String>): List<VaultSeed> =
-        seedVaultRepository
-            .getSeeds()
+        getSeeds()
             .first()
             .filter { seed -> seed.authorizedApps.any { it.packageName in packages } }
 
@@ -130,7 +135,7 @@ class SeedVaultService : Service() {
             accounts =
                 addresses.map { account ->
                     val publicKey =
-                        checkNotNull(seedVaultRepository.getPublicKey(account.address)) { "No public key for ${account.address}" }
+                        checkNotNull(getPublicKey(account.address)) { "No public key for ${account.address}" }
                     RemoteAccount(
                         index = account.index,
                         address = account.address,

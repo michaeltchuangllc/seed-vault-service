@@ -1,4 +1,4 @@
-package com.michaeltchuang.seedvault.service.data.vault
+package com.michaeltchuang.seedvault.service.domain.vault
 
 /** Where the secret keys of a seed live. The name is stored in the seed row. */
 internal enum class SeedStorage {

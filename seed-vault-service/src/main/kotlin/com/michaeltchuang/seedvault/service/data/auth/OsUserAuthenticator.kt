@@ -2,7 +2,7 @@ package com.michaeltchuang.seedvault.service.data.auth
 
 import android.content.Context
 import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -58,7 +58,7 @@ internal class OsUserAuthenticator(
     }
 
     private companion object {
-        // BIOMETRIC_STRONG combined with DEVICE_CREDENTIAL is not supported before Android 11
-        const val AUTHENTICATORS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
+        // Only a strong biometric or the screen lock gives the auth token that unlocks the Keystore seed key
+        const val AUTHENTICATORS = BIOMETRIC_STRONG or DEVICE_CREDENTIAL
     }
 }

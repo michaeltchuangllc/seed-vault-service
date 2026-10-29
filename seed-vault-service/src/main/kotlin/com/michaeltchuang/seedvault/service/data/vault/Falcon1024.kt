@@ -1,6 +1,7 @@
 package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES
+import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
 import uniffi.algokit_crypto_ffi.Falcon1024Account
 import uniffi.algokit_crypto_ffi.falcon1024AccountFromEntropy
 import uniffi.algokit_crypto_ffi.falcon1024NthAddress

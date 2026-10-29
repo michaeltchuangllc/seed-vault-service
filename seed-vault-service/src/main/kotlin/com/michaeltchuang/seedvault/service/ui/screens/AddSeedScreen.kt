@@ -20,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.michaeltchuang.seedvault.service.R
+import com.michaeltchuang.seedvault.service.ui.auth.rememberRequireAuth
 import com.michaeltchuang.seedvault.service.ui.components.SecureScreen
 import com.michaeltchuang.seedvault.service.ui.components.SeedPhraseGrid
 import com.michaeltchuang.seedvault.service.ui.components.SeedPhraseWarning
@@ -43,6 +44,8 @@ fun AddSeedScreen(
 ) {
     val viewState by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // The Keystore key that encrypts the seed only works right after the user verified themselves
+    val requireAuth = rememberRequireAuth(title = stringResource(R.string.save_seed_auth_title))
 
     LaunchedEffect(Unit) {
         viewModel.viewEvent.collect { event ->
@@ -59,7 +62,7 @@ fun AddSeedScreen(
         seedPhrase = content?.seedPhrase.orEmpty(),
         isSaving = content?.isSaving == true,
         onBack = onBack,
-        onSave = viewModel::onSave,
+        onSave = { isBackedUp -> requireAuth { viewModel.onSave(isBackedUp) } },
         modifier = modifier,
     )
 }

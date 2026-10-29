@@ -26,9 +26,9 @@ None of them may depend on `wallet-sdk-ui`. Only `seed-vault-service` uses `wall
 
 ## Where secrets live: `SeedKeyVault`
 
-Secret keys sit behind `SeedKeyVault` (`data/vault`), with two implementations. The repository picks one per seed and each seed row remembers its choice in the `storage` column.
+Secret keys sit behind `SeedKeyVault` (interface in `domain/vault`, implementations in `data/vault`), with two implementations. The repository picks one per seed and each seed row remembers its choice in the `storage` column.
 
-- `RoomSeedKeyVault`: entropy and private key encrypted with the Android Keystore key, stored in the seed row. Used when the device has no Trusty applet. This is also the emulated path.
+- `RoomSeedKeyVault`: entropy and private key encrypted by `KeystoreSecretCipher` (AES-256-GCM, StrongBox when present else TEE, usable only within 60 s of a strong biometric / screen lock verification), stored in the seed row. Add, reveal and sign therefore need the user to verify first; the UI wraps them in `rememberRequireAuth`. The index 1 (autosign) private key is a second copy under a StrongBox key that needs no user (`AUTOSIGN_KEY_ALIAS`), so Room seeds can autosign. Both addresses share one Falcon key, so the fingerprint gate on index 0 is software-only against code inside the app. Used when the device has no Trusty applet. This is also the emulated path.
 - `TrustySeedKeyVault`: keys stay in the Trusty applet in the TEE, reached through `libs/algokit_seed_vault.aar`. The seed row keeps only the address and public key, the encrypted columns are empty. It is available only when `client.status()` is `Available`; any failure counts as unavailable.
 
 Rules:
