@@ -98,7 +98,9 @@ internal class TrustySeedKeyVault(
         transaction: ByteArray,
     ): ByteArray? {
         val listed = listAccount(seed.account(addressIndex).address)
-        return client.signTransaction(listed.account.address, listed.account.addressIndex.toUByte(), transaction).signedTxn
+        // algokit encodes transactions with the "TX" prefix, the applet only takes the bare msgpack and adds it itself
+        val unprefixed = if (transaction.startsWith(TX_PREFIX)) transaction.copyOfRange(TX_PREFIX.size, transaction.size) else transaction
+        return client.signTransaction(listed.account.address, listed.account.addressIndex.toUByte(), unprefixed).signedTxn
     }
 
     /** Removes the seed, which takes its autosign account along. One that is already gone is skipped, so a failed delete can be tried again. */
@@ -116,6 +118,10 @@ internal class TrustySeedKeyVault(
             ?: throw IllegalStateException("The Trusty applet has no account $address")
 
     private companion object {
+        val TX_PREFIX = "TX".encodeToByteArray()
+
+        fun ByteArray.startsWith(prefix: ByteArray) = size >= prefix.size && prefix.indices.all { this[it] == prefix[it] }
+
         fun appletIndex(index: Int): UByte =
             when (index) {
                 HUMAN_SIGN_ADDRESS_INDEX -> humanSignIndex()

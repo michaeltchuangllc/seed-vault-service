@@ -132,6 +132,16 @@ class TrustySeedKeyVaultTest {
         }
 
     @Test
+    fun signTransactionPassesTheAppletTheTransactionWithoutTheTxPrefix() =
+        runTest {
+            val msgpack = byteArrayOf(0x89.toByte(), 1, 2)
+
+            vault.signTransaction(storedSeed(), AUTOSIGN_ADDRESS_INDEX, "TX".encodeToByteArray() + msgpack)
+
+            assertArrayEquals(msgpack, applet.signedTxn)
+        }
+
+    @Test
     fun signBytesTurnsAReservedPrefixIntoAnIllegalArgument() =
         runTest {
             applet.signError = SeedVaultException.Applet(AppletErrorCode.RESERVED_DOMAIN_PREFIX)
@@ -186,6 +196,7 @@ class TrustySeedKeyVaultTest {
         var signError: SeedVaultException? = null
         var signedAddress: String? = null
         var signedIndex: UByte? = null
+        var signedTxn: ByteArray? = null
         val importedMnemonics = mutableListOf<String>()
         var importedAlgorithm: KeyAlgorithm? = null
         val importedIndexes = mutableListOf<UByte>()
@@ -253,6 +264,7 @@ class TrustySeedKeyVaultTest {
         ): SignedTransaction {
             signedAddress = address
             signedIndex = addressIndex
+            signedTxn = txn
             return SignedTransaction(KeyAlgorithm.FALCON1024, txn, ByteArray(0))
         }
 

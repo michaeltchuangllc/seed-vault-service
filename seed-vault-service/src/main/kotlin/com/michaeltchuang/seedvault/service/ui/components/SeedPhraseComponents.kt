@@ -31,16 +31,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.michaeltchuang.seedvault.service.BuildConfig
 import com.michaeltchuang.seedvault.service.R
 import com.michaeltchuang.seedvault.service.ui.preview.SeedVaultPreviewData
 import com.michaeltchuang.seedvault.service.ui.theme.SeedVaultTheme
 
 /**
  * Keeps the seed phrase out of screenshots, screen recordings and the recents thumbnail while
- * the calling screen is shown.
+ * the calling screen is shown. Debug builds skip it so the screens can be mirrored while testing.
  */
 @Composable
 fun SecureScreen() {
+    if (BuildConfig.DEBUG) return
     val window = LocalActivity.current?.window ?: return
     DisposableEffect(window) {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
