@@ -18,10 +18,14 @@ class PermissionGauntletActivity : AppCompatActivity() {
 
         // The Seed Vault Service permission is dangerous: it is lost when that app is reinstalled, so ask
         // for it even when the Solana one is already granted. It is only defined while that app is
-        // installed, and the connect button reports the problem if it is not.
+        // installed, and the connect button reports the problem if it is not. The Solana one is only
+        // asked for when the Solana Seed Vault is installed: without it the permission does not exist
+        // and the request is denied right away.
         val missing =
             buildList {
-                if (!SolanaSeedVaultClient.hasPermission(this@PermissionGauntletActivity)) {
+                if (SolanaSeedVaultClient.isAvailable(this@PermissionGauntletActivity) &&
+                    !SolanaSeedVaultClient.hasPermission(this@PermissionGauntletActivity)
+                ) {
                     add(SolanaSeedVaultClient.PERMISSION_ACCESS_SEED_VAULT)
                 }
                 if (!isGranted(SeedVaultServiceConstants.PERMISSION_ACCESS_SEED_VAULT)) {
@@ -42,8 +46,10 @@ class PermissionGauntletActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        // Only the Solana Seed Vault permission is required to continue
-        if (SolanaSeedVaultClient.hasPermission(this)) {
+        // Either vault's permission is enough to continue, the demo screen shows the state of each
+        if (SolanaSeedVaultClient.hasPermission(this) ||
+            isGranted(SeedVaultServiceConstants.PERMISSION_ACCESS_SEED_VAULT)
+        ) {
             Log.d(TAG, "Access Seed Vault permission granted")
             startActivity(Intent(this, MainActivity::class.java))
         } else {

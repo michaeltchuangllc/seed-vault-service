@@ -607,6 +607,8 @@ class WalletServiceDemoViewModel(
      * Observe Seed Vault content changes and auto-refresh UI state.
      */
     private fun observeSeedVaultContentChanges() {
+        // Without the Solana Seed Vault there is no provider to observe, the Solana tab shows it as not installed
+        if (!SolanaSeedVaultClient.isAvailable(getApplication())) return
         viewModelScope.launch {
             try {
                 solanaVaultClient.observeChanges().collect {
