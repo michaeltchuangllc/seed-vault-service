@@ -29,6 +29,7 @@ data class VaultAddress(
  * Only display data lives here: no seed phrase, private key or derivation material.
  *
  * @param addresses the Falcon-1024 accounts of the seed, by index
+ * @param supportsKeyDerivation whether apps can derive key material from the seed
  */
 data class VaultSeed(
     val id: Long,
@@ -36,6 +37,7 @@ data class VaultSeed(
     val isBackedUp: Boolean,
     val authorizedApps: List<AuthorizedApp>,
     val addresses: List<VaultAddress> = emptyList(),
+    val supportsKeyDerivation: Boolean = false,
 ) {
     /** The human sign address, or empty for a seed that has none. */
     val address: String get() = addressAt(HUMAN_SIGN_ADDRESS_INDEX).orEmpty()

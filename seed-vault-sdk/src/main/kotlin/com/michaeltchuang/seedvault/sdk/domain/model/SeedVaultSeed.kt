@@ -26,6 +26,8 @@ data class SeedVaultSeed(
  * @param requiresApproval whether signing needs the confirm sign screen, as of the last
  * `getAuthorizedSeeds`. The user can change autosign at any time and the service checks on every
  * signature, so be ready for a SecurityException even when this is false
+ * @param supportsKeyDerivation whether `deriveKeyMaterial` works for this account. False with an older
+ * Seed Vault app
  */
 @Serializable
 data class SeedVaultAccount(
@@ -34,4 +36,5 @@ data class SeedVaultAccount(
     val publicKey: String,
     val isAutosign: Boolean = false,
     val requiresApproval: Boolean = true,
+    val supportsKeyDerivation: Boolean = false,
 )

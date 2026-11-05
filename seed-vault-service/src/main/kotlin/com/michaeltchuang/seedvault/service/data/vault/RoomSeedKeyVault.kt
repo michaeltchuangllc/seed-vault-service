@@ -3,6 +3,7 @@ package com.michaeltchuang.seedvault.service.data.vault
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.SEED_ADDRESS_INDEXES
 import com.michaeltchuang.seedvault.service.domain.vault.FalconKeys
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import com.michaeltchuang.seedvault.service.domain.vault.SecretCipher
 import com.michaeltchuang.seedvault.service.domain.vault.SeedKeyVault
 import com.michaeltchuang.seedvault.service.domain.vault.SeedStorage
@@ -26,6 +27,8 @@ internal class RoomSeedKeyVault(
     override val storage = SeedStorage.ROOM
 
     override suspend fun isAvailable() = true
+
+    override val supportsKeyDerivation = true
 
     override suspend fun addSeed(seedPhrase: List<String>): StoredSeed {
         val entropy = falcon.entropyFromSeedPhrase(seedPhrase)
@@ -70,6 +73,30 @@ internal class RoomSeedKeyVault(
         val account = seed.account(addressIndex)
         return withPrivateKey(account) { privateKey ->
             falcon.signTransaction(account.publicKey, privateKey, account.salt, transaction)
+        }
+    }
+
+    /**
+     * Signs the derivation message with the key of the account itself, like [signBytes]. For the human
+     * sign account that is a key only the user auth [cipher] reads, so the user must have just verified
+     * themselves. For an autosign account it is the autosign key, which needs no user while the user
+     * allows autosign (the service decides that).
+     */
+    override suspend fun deriveKeyMaterial(
+        seed: StoredSeed,
+        addressIndex: Int,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray {
+        KeyDerivation.requireValid(domain, info, length)
+        val account = seed.account(addressIndex)
+        val message = KeyDerivation.message(account.address, domain, info)
+        val signature = withPrivateKey(account) { privateKey -> falcon.signBytes(privateKey, message) }
+        try {
+            return KeyDerivation.derive(signature, account.address, domain, info, length)
+        } finally {
+            signature.fill(0)
         }
     }
 

@@ -91,6 +91,17 @@ internal class SeedVaultRepositoryImpl(
             vaultFor(seed.seed).signTransaction(seed.toStoredSeed(), index, transaction)
         }
 
+    override suspend fun deriveKeyMaterial(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray? =
+        withContext(coroutineDispatcher) {
+            val (seed, index) = seedOf(address) ?: return@withContext null
+            vaultFor(seed.seed).deriveKeyMaterial(seed.toStoredSeed(), index, domain, info, length)
+        }
+
     override suspend fun getSeedPhrase(seedId: Long): List<String>? =
         withContext(coroutineDispatcher) {
             val seed = seedDao.get(seedId) ?: return@withContext null
@@ -174,6 +185,11 @@ internal class SeedVaultRepositoryImpl(
                     AuthorizedApp(packageName = it.packageName, label = it.label, isPrivileged = it.isPrivileged)
                 },
             addresses = accounts.sortedBy { it.addressIndex }.map { VaultAddress(index = it.addressIndex, address = it.address) },
+            supportsKeyDerivation =
+                when (seed.storage) {
+                    SeedStorage.ROOM -> roomVault.supportsKeyDerivation
+                    SeedStorage.TRUSTY -> trustyVault.supportsKeyDerivation
+                },
         )
 
     private companion object {

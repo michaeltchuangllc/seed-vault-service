@@ -27,6 +27,22 @@ internal class SignOperation private constructor(
             transaction: ByteArray,
         ) = SignOperation(address, digestOf("transaction".toByteArray(), address.toByteArray(), transaction))
 
+        fun deriveKeyMaterial(
+            address: String,
+            domain: String,
+            info: ByteArray,
+            length: Int,
+        ) = SignOperation(
+            address,
+            digestOf(
+                "deriveKeyMaterial".toByteArray(),
+                address.toByteArray(),
+                domain.toByteArray(),
+                info,
+                ByteBuffer.allocate(Int.SIZE_BYTES).putInt(length).array(),
+            ),
+        )
+
         /** Each part is length-prefixed, so different splits of the same bytes give different digests. */
         private fun digestOf(vararg parts: ByteArray): String {
             val sha = MessageDigest.getInstance("SHA-256")
