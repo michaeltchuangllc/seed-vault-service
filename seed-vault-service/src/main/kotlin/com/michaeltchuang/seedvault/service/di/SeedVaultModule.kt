@@ -14,6 +14,7 @@ import com.michaeltchuang.seedvault.service.domain.repository.SeedVaultRepositor
 import com.michaeltchuang.seedvault.service.domain.usecase.AddSeed
 import com.michaeltchuang.seedvault.service.domain.usecase.AuthorizeApp
 import com.michaeltchuang.seedvault.service.domain.usecase.DeleteSeed
+import com.michaeltchuang.seedvault.service.domain.usecase.DeriveKeyMaterial
 import com.michaeltchuang.seedvault.service.domain.usecase.GenerateSeedPhrase
 import com.michaeltchuang.seedvault.service.domain.usecase.GenerateSeedPhraseUseCase
 import com.michaeltchuang.seedvault.service.domain.usecase.GetPublicKey
@@ -74,6 +75,7 @@ val seedVaultModule =
         factory { AuthorizeApp(get<SeedVaultRepository>()::authorizeApp) }
         factory { SignBytes(get<SeedVaultRepository>()::signBytes) }
         factory { SignTransaction(get<SeedVaultRepository>()::signTransaction) }
+        factory { DeriveKeyMaterial(get<SeedVaultRepository>()::deriveKeyMaterial) }
         factory { GetPublicKey(get<SeedVaultRepository>()::getPublicKey) }
         factory<RenameSeed> { RenameSeedUseCase(get()) }
         factory { DeleteSeed(get<SeedVaultRepository>()::deleteSeed) }

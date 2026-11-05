@@ -182,7 +182,7 @@ private fun ColumnScope.AlgorandTab(
             modifier = Modifier.weight(1f),
             enabled = uiState.serviceConnected && !uiState.loading,
         ) {
-            Text("Authorize App")
+            Text("Authorize Seed Access")
         }
 
         // Opens the Seed Vault Service app to create, import and manage seeds

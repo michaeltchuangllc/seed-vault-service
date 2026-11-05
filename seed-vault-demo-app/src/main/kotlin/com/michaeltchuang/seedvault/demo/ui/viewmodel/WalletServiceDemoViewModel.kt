@@ -133,7 +133,7 @@ class WalletServiceDemoViewModel(
                 _uiState.update {
                     it.copy(
                         seedVaultSeeds = seeds,
-                        errorMessage = if (seeds.isEmpty()) "No authorized seeds. Tap Authorize App to choose seeds." else null,
+                        errorMessage = if (seeds.isEmpty()) "No authorized seeds. Tap Authorize Seed Access to choose seeds." else null,
                         loading = false,
                     )
                 }

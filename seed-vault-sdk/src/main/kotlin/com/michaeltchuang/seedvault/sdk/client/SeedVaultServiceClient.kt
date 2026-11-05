@@ -114,6 +114,29 @@ class SeedVaultServiceClient(
         transaction: ByteArray,
     ): ByteArray? = requireService().signTransaction(address, transaction)
 
+    /**
+     * Derive [length] bytes for [address] that only this seed can produce, e.g. the private key of a
+     * passkey. Same result every time for the same inputs, also after a restore from the seed phrase.
+     * Check [com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultAccount.supportsKeyDerivation] first.
+     *
+     * [domain] must start with [SeedVaultServiceConstants.DERIVE_DOMAIN_PREFIX]. [info] is your context,
+     * e.g. origin, user handle and a counter. Always needs the user: start [confirmDeriveKeyMaterialIntent]
+     * with the same values and call this after RESULT_OK. Throws SecurityException without an approval or
+     * authorization, IllegalArgumentException for a refused value, UnsupportedOperationException if the
+     * seed cannot derive, and also when the installed Seed Vault app is too old to have this method.
+     */
+    fun deriveKeyMaterial(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int = SeedVaultServiceConstants.DERIVE_MAX_LENGTH,
+    ): ByteArray? =
+        try {
+            requireService().deriveKeyMaterial(address, domain, info, length)
+        } catch (e: android.os.RemoteException) {
+            throw UnsupportedOperationException("This Seed Vault app does not support deriveKeyMaterial", e)
+        }
+
     /** Intent for the authorization screen. Start it with startActivityForResult. */
     fun authorizeAppIntent(): Intent =
         Intent(SeedVaultServiceConstants.ACTION_AUTHORIZE_APP).apply {
@@ -137,6 +160,18 @@ class SeedVaultServiceClient(
         address: String,
         transaction: ByteArray,
     ): Intent = confirmSignIntent(address).putExtra(SeedVaultServiceConstants.EXTRA_TRANSACTION, transaction)
+
+    /** Same for [deriveKeyMaterial]: pass the same values to it after RESULT_OK. */
+    fun confirmDeriveKeyMaterialIntent(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int = SeedVaultServiceConstants.DERIVE_MAX_LENGTH,
+    ): Intent =
+        confirmSignIntent(address)
+            .putExtra(SeedVaultServiceConstants.EXTRA_DOMAIN, domain)
+            .putExtra(SeedVaultServiceConstants.EXTRA_INFO, info)
+            .putExtra(SeedVaultServiceConstants.EXTRA_LENGTH, length)
 
     private fun confirmSignIntent(address: String): Intent =
         Intent(SeedVaultServiceConstants.ACTION_CONFIRM_SIGN)
