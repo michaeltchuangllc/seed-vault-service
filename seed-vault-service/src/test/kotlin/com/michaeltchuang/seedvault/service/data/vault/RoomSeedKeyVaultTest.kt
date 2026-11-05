@@ -4,6 +4,7 @@ import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.vault.FalconKeyPair
 import com.michaeltchuang.seedvault.service.domain.vault.FalconKeys
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
 import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import kotlinx.coroutines.test.runTest
@@ -129,6 +130,76 @@ class RoomSeedKeyVaultTest {
             assertFailsWith<IllegalArgumentException> {
                 vault.signBytes(StoredSeed(seed.encryptedEntropy, listOf(swapped)), AUTOSIGN_ADDRESS_INDEX, DATA)
             }
+        }
+
+    @Test
+    fun derivedKeyMaterialIsStableAndDifferentPerAccount() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+
+            val first = vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "passkey/v1", DATA, 64)
+            val again = vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "passkey/v1", DATA, 64)
+            val autosign = vault.deriveKeyMaterial(seed, AUTOSIGN_ADDRESS_INDEX, "passkey/v1", DATA, 64)
+
+            assertTrue(vault.supportsKeyDerivation)
+            assertArrayEquals(first, again)
+            assertFalse(first.contentEquals(autosign))
+        }
+
+    @Test
+    fun anAutosignAccountDerivesFromItsOwnKeyAndNeedsNoUser() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+            val autosignAddress = seed.account(AUTOSIGN_ADDRESS_INDEX).address
+            // Autosign being usable is enough, like signing with the autosign account
+            userAuthCipher.locked = true
+
+            val derived = vault.deriveKeyMaterial(seed, AUTOSIGN_ADDRESS_INDEX, "passkey/v1", DATA, 64)
+
+            // The fake signature is "private key then data", so the autosign key (not the human one) must have signed
+            val message = KeyDerivation.message(autosignAddress, "passkey/v1", DATA)
+            val expected =
+                KeyDerivation.derive(
+                    PRIVATE_KEYS.getValue(AUTOSIGN_ADDRESS_INDEX) + message,
+                    autosignAddress,
+                    "passkey/v1",
+                    DATA,
+                    64,
+                )
+            assertArrayEquals(expected, derived)
+        }
+
+    @Test
+    fun theHumanSignKeyIsWipedAfterDeriving() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+            vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "passkey/v1", DATA, 32)
+
+            assertTrue(falcon.privateKeys.all { key -> key.all { it == 0.toByte() } })
+        }
+
+    @Test
+    fun theHumanSignAccountNeedsTheUserToBeVerifiedToDerive() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+            userAuthCipher.locked = true
+            // Autosign being usable must not open the human sign key
+            autosignCipher.locked = false
+
+            assertFailsWith<IllegalStateException> { vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "passkey/v1", DATA, 32) }
+
+            userAuthCipher.locked = false
+            vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "passkey/v1", DATA, 32)
+        }
+
+    @Test
+    fun derivingRefusesOtherDomainsBeforeTouchingAKey() =
+        runTest {
+            val seed = vault.addSeed(SEED_PHRASE)
+            userAuthCipher.locked = true
+
+            // The request is refused, not "user not verified", so no key was decrypted
+            assertFailsWith<IllegalArgumentException> { vault.deriveKeyMaterial(seed, HUMAN_SIGN_ADDRESS_INDEX, "sign/v1", DATA, 32) }
         }
 
     private suspend inline fun <reified T : Throwable> assertFailsWith(block: () -> Unit) {

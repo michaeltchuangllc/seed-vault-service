@@ -20,4 +20,12 @@ object SeedVaultServiceConstants {
     const val EXTRA_ADDRESS = "address"
     const val EXTRA_DATA = "data"
     const val EXTRA_TRANSACTION = "transaction"
+    const val EXTRA_DOMAIN = "domain"
+    const val EXTRA_INFO = "info"
+    const val EXTRA_LENGTH = "length"
+
+    /** Domains for deriveKeyMaterial must start with this. */
+    const val DERIVE_DOMAIN_PREFIX = "passkey/"
+    const val DERIVE_MIN_LENGTH = 32
+    const val DERIVE_MAX_LENGTH = 64
 }

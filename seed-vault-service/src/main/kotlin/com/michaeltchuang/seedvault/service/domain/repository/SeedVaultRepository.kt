@@ -39,6 +39,18 @@ interface SeedVaultRepository {
         transaction: ByteArray,
     ): ByteArray?
 
+    /**
+     * Derives [length] bytes for an app from the seed behind [address] (see
+     * [com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation]). Returns null if no seed has
+     * that address. Throws [UnsupportedOperationException] if the keys of the seed cannot derive.
+     */
+    suspend fun deriveKeyMaterial(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray?
+
     /** Returns the Falcon-1024 public key of the account with [address], or null if no seed has it. */
     suspend fun getPublicKey(address: String): ByteArray?
 

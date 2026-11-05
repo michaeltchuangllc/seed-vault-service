@@ -2,6 +2,7 @@ package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
 import com.michaeltchuang.seedvault.service.domain.vault.StoredSeed
 import kotlinx.coroutines.test.runTest
@@ -31,6 +32,46 @@ class TrustySeedKeyVaultTest {
             humanAddressOf = { HUMAN_ADDRESS },
         )
     private val seedPhrase = List(25) { "word$it" }
+
+    @Test
+    fun derivesKeyMaterialFromAnAppletSignatureMadeWithTheAccountsOwnKey() =
+        kotlinx.coroutines.test.runTest {
+            val seed = storedSeed()
+
+            for (index in listOf(HUMAN_SIGN_ADDRESS_INDEX, AUTOSIGN_ADDRESS_INDEX)) {
+                val account = seed.account(index)
+                val derived = vault.deriveKeyMaterial(seed, index, "passkey/v1", byteArrayOf(1), 64)
+
+                org.junit.Assert.assertTrue(vault.supportsKeyDerivation)
+                // Each account asks the applet to sign with its own key, so the applet decides what that needs
+                org.junit.Assert.assertEquals(account.address, applet.signedAddress)
+                org.junit.Assert.assertEquals(APPLET_INDEXES.getValue(index), applet.signedIndex)
+                val message = KeyDerivation.message(account.address, "passkey/v1", byteArrayOf(1))
+                // The fake applet signs by reversing the data
+                org.junit.Assert.assertArrayEquals(
+                    KeyDerivation.derive(message.reversedArray(), account.address, "passkey/v1", byteArrayOf(1), 64),
+                    derived,
+                )
+            }
+        }
+
+    @Test
+    fun derivingRefusesOtherDomainsBeforeTheAppletIsAsked() =
+        kotlinx.coroutines.test.runTest {
+            val failure =
+                runCatching {
+                    vault.deriveKeyMaterial(
+                        storedSeed(),
+                        HUMAN_SIGN_ADDRESS_INDEX,
+                        "sign/v1",
+                        byteArrayOf(1),
+                        32,
+                    )
+                }.exceptionOrNull()
+
+            org.junit.Assert.assertTrue("Got $failure", failure is IllegalArgumentException)
+            org.junit.Assert.assertNull(applet.signedAddress)
+        }
 
     private fun storedSeed() =
         StoredSeed(

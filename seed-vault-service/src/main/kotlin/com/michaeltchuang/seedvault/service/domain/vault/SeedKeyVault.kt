@@ -65,6 +65,23 @@ internal interface SeedKeyVault {
         transaction: ByteArray,
     ): ByteArray?
 
+    /** Whether [deriveKeyMaterial] works for seeds in this vault. */
+    val supportsKeyDerivation: Boolean
+
+    /**
+     * Derives [length] bytes for an app from the seed, for the account at [addressIndex] (see
+     * [KeyDerivation]). The same seed phrase gives the same bytes in every vault. Throws
+     * [IllegalArgumentException] if the request is refused and [UnsupportedOperationException] if this
+     * vault cannot derive.
+     */
+    suspend fun deriveKeyMaterial(
+        seed: StoredSeed,
+        addressIndex: Int,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray
+
     /** Removes the secrets of the seed. */
     suspend fun deleteSeed(seed: StoredSeed)
 }

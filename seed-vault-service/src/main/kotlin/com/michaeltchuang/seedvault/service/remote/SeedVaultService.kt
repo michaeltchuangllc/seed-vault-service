@@ -10,10 +10,12 @@ import com.michaeltchuang.seedvault.service.ISeedVaultService
 import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
+import com.michaeltchuang.seedvault.service.domain.usecase.DeriveKeyMaterial
 import com.michaeltchuang.seedvault.service.domain.usecase.GetPublicKey
 import com.michaeltchuang.seedvault.service.domain.usecase.GetSeeds
 import com.michaeltchuang.seedvault.service.domain.usecase.SignBytes
 import com.michaeltchuang.seedvault.service.domain.usecase.SignTransaction
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -34,6 +36,7 @@ class SeedVaultService : Service() {
     private val getPublicKey: GetPublicKey by inject()
     private val signBytesUseCase: SignBytes by inject()
     private val signTransactionUseCase: SignTransaction by inject()
+    private val deriveKeyMaterialUseCase: DeriveKeyMaterial by inject()
     private val signApprovals: SignApprovalCoordinator by inject()
     private val transactionDecoder: TransactionDecoder by inject()
     private val autosignSettings: AutosignSettings by inject()
@@ -81,6 +84,23 @@ class SeedVaultService : Service() {
                     val index = requireAuthorized(packages, address)
                     requireUserApproval(packages, index, SignOperation.transaction(address, transaction))
                     signTransactionUseCase(address, transaction)
+                }
+            }
+
+            override fun deriveKeyMaterial(
+                address: String,
+                domain: String,
+                info: ByteArray,
+                length: Int,
+            ): ByteArray? {
+                val packages = callerPackages()
+                // A refused request is the caller's mistake, so it is checked before anything is looked up
+                KeyDerivation.requireValid(domain, info, length)
+                return runBlocking(Dispatchers.IO) {
+                    val index = requireAuthorized(packages, address)
+                    // Same rule as a signature with the account: the autosign account needs no approval while autosign is on
+                    requireUserApproval(packages, index, SignOperation.deriveKeyMaterial(address, domain, info, length))
+                    deriveKeyMaterialUseCase(address, domain, info, length)
                 }
             }
         }
@@ -142,6 +162,7 @@ class SeedVaultService : Service() {
                         publicKey = Base64.encodeToString(publicKey, Base64.NO_WRAP),
                         isAutosign = account.isAutosign,
                         requiresApproval = requiresApproval(account.index),
+                        supportsKeyDerivation = supportsKeyDerivation,
                     )
                 },
         )

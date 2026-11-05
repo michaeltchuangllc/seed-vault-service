@@ -48,6 +48,19 @@ fun interface SignTransaction {
     ): ByteArray?
 }
 
+/**
+ * Derives key material for an app from the seed behind an address, e.g. the key of a passkey. The
+ * seed phrase and the signing keys are never returned.
+ */
+fun interface DeriveKeyMaterial {
+    suspend operator fun invoke(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray?
+}
+
 /** The public key of one of a seed's accounts, or null if no seed has [address]. */
 fun interface GetPublicKey {
     suspend operator fun invoke(address: String): ByteArray?

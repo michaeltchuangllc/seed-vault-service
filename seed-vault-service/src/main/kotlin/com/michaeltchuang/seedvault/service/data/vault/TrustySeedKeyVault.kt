@@ -2,6 +2,7 @@ package com.michaeltchuang.seedvault.service.data.vault
 
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.HUMAN_SIGN_ADDRESS_INDEX
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import com.michaeltchuang.seedvault.service.domain.vault.SeedKeyVault
 import com.michaeltchuang.seedvault.service.domain.vault.SeedStorage
 import com.michaeltchuang.seedvault.service.domain.vault.StoredAccount
@@ -39,6 +40,38 @@ internal class TrustySeedKeyVault(
     override val storage = SeedStorage.TRUSTY
 
     private val client by lazy(clientFactory)
+
+    /** Derives from a signature the applet makes, since the entropy never leaves the TEE (see [KeyDerivation]). */
+    override val supportsKeyDerivation = true
+
+    /**
+     * Has the applet sign the derivation message with the key of the account itself, so the result is the
+     * same as in [RoomSeedKeyVault] for the same seed phrase. The applet decides what a signature with
+     * that index needs, as for [signBytes].
+     */
+    override suspend fun deriveKeyMaterial(
+        seed: StoredSeed,
+        addressIndex: Int,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray {
+        KeyDerivation.requireValid(domain, info, length)
+        val address = seed.account(addressIndex).address
+        val listed = listAccount(address)
+        val signature =
+            client
+                .signArbitraryData(
+                    listed.account.address,
+                    listed.account.addressIndex.toUByte(),
+                    KeyDerivation.message(address, domain, info),
+                ).signature
+        try {
+            return KeyDerivation.derive(signature, address, domain, info, length)
+        } finally {
+            signature.fill(0)
+        }
+    }
 
     /**
      * Any failure counts as unavailable: no applet, no permission to reach it, an incompatible

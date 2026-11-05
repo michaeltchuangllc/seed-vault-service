@@ -65,6 +65,16 @@ class FakeSeedVaultRepository(
         return if (hasAddress(address)) transaction.reversedArray() else null
     }
 
+    override suspend fun deriveKeyMaterial(
+        address: String,
+        domain: String,
+        info: ByteArray,
+        length: Int,
+    ): ByteArray? {
+        failure?.let { throw it }
+        return if (hasAddress(address)) ByteArray(length) { (domain.length + info.size).toByte() } else null
+    }
+
     private fun hasAddress(address: String) = seeds.any { it.indexOf(address) != null }
 
     override suspend fun getPublicKey(address: String): ByteArray? =

@@ -60,4 +60,30 @@ interface ISeedVaultService {
      * @throws IllegalArgumentException if the bytes are not a transaction, or its sender is not the address
      */
     byte[] signTransaction(String address, in byte[] transaction);
+
+    /**
+     * Derive key material for an app from the seed behind an account, e.g. the private key of a passkey.
+     * The seed phrase and the signing keys are never returned. The result is the same every time for the
+     * same seed, address, domain and info, so it can be recreated after the app or device is restored
+     * from the same seed phrase. Added after signTransaction, so the transaction codes of the methods
+     * above did not change; an older Seed Vault app does not have it (see supportsKeyDerivation in getAuthorizedSeeds).
+     *
+     * Needs an approval exactly like a signature with the same account (see requiresApproval in
+     * getAuthorizedSeeds): always for the human sign account, and for an autosign account only while the user
+     * does not allow autosign. When it needs one, start CONFIRM_SIGN with the same address, domain, info and
+     * length first (see SeedVaultContract), then call this within a minute.
+     * The account signs a fixed message (address, domain, info) with its own Falcon-1024 key, which is
+     * deterministic, and the result is HKDF-SHA512 over that signature, version 1. It works the same for
+     * seeds in Room and in the Trusty applet.
+     *
+     * @param address the address of an account returned by getAuthorizedSeeds
+     * @param domain what the key is for. Must start with "passkey/" and be at most 64 bytes
+     * @param info context from the app, e.g. origin and user handle of a passkey. At most 1024 bytes
+     * @param length number of bytes to return, 32 to 64
+     * @return the derived bytes, or null if the derivation failed
+     * @throws SecurityException if the calling app is not authorized for the address, or there is no approval
+     * @throws IllegalArgumentException if the domain, info or length is refused
+     * @throws UnsupportedOperationException if the keys of the seed cannot derive
+     */
+    byte[] deriveKeyMaterial(String address, String domain, in byte[] info, int length);
 }

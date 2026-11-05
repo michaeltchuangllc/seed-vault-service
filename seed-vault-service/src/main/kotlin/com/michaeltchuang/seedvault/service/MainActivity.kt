@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.fragment.app.FragmentActivity
+import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import com.michaeltchuang.seedvault.service.remote.DecodedTransaction
 import com.michaeltchuang.seedvault.service.remote.SeedVaultContract
 import com.michaeltchuang.seedvault.service.remote.SignApprovalCoordinator
@@ -99,9 +100,17 @@ class MainActivity : FragmentActivity() {
         val callerPackage = callingActivity?.packageName ?: return null
         val address = intent.getStringExtra(SeedVaultContract.EXTRA_ADDRESS)?.takeIf { it.isNotBlank() } ?: return null
         val transaction = intent.getByteArrayExtra(SeedVaultContract.EXTRA_TRANSACTION)
+        val domain = intent.getStringExtra(SeedVaultContract.EXTRA_DOMAIN)
         val operation: SignOperation
         val description: String
-        if (transaction != null) {
+        if (domain != null) {
+            // Derive key material: refuse what the service would refuse, so the user is never asked for it
+            val info = intent.getByteArrayExtra(SeedVaultContract.EXTRA_INFO) ?: ByteArray(0)
+            val length = intent.getIntExtra(SeedVaultContract.EXTRA_LENGTH, 0)
+            if (runCatching { KeyDerivation.requireValid(domain, info, length) }.isFailure) return null
+            operation = SignOperation.deriveKeyMaterial(address, domain, info, length)
+            description = getString(R.string.confirm_derive_passkey, domain.removePrefix(KeyDerivation.DOMAIN_PREFIX))
+        } else if (transaction != null) {
             // Show what the transaction does, and refuse one the vault would not sign anyway
             val decoded = transactionDecoder.decode(transaction)?.takeIf { it.sender == address } ?: return null
             operation = SignOperation.transaction(address, transaction)
