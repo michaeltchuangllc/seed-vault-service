@@ -3,6 +3,7 @@ package com.michaeltchuang.seedvault.service
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -100,29 +101,45 @@ class MainActivity : FragmentActivity() {
         val callerPackage = callingActivity?.packageName ?: return null
         val address = intent.getStringExtra(SeedVaultContract.EXTRA_ADDRESS)?.takeIf { it.isNotBlank() } ?: return null
         val transaction = intent.getByteArrayExtra(SeedVaultContract.EXTRA_TRANSACTION)
+        val batch = intent.getStringArrayListExtra(SeedVaultContract.EXTRA_TRANSACTIONS)
         val domain = intent.getStringExtra(SeedVaultContract.EXTRA_DOMAIN)
-        val operation: SignOperation
+        val operations: List<SignOperation>
         val description: String
-        if (domain != null) {
+        if (batch != null) {
+            // Several transactions of one account, approved once: every one is shown and checked like a single transaction
+            if (batch.isEmpty() || batch.size > MAX_BATCH_TRANSACTIONS) return null
+            val decoded =
+                batch.map { encoded ->
+                    val bytes = runCatching { Base64.decode(encoded, Base64.NO_WRAP) }.getOrNull() ?: return null
+                    bytes to (transactionDecoder.decode(bytes)?.takeIf { it.sender == address } ?: return null)
+                }
+            operations = decoded.map { (bytes, _) -> SignOperation.transaction(address, bytes) }
+            description =
+                getString(R.string.confirm_sign_batch, decoded.size) + "\n\n" +
+                decoded
+                    .mapIndexed { index, (_, tx) ->
+                        getString(R.string.confirm_sign_batch_item, index + 1, describe(tx).lines().first())
+                    }.joinToString("\n")
+        } else if (domain != null) {
             // Derive key material: refuse what the service would refuse, so the user is never asked for it
             val info = intent.getByteArrayExtra(SeedVaultContract.EXTRA_INFO) ?: ByteArray(0)
             val length = intent.getIntExtra(SeedVaultContract.EXTRA_LENGTH, 0)
             if (runCatching { KeyDerivation.requireValid(domain, info, length) }.isFailure) return null
-            operation = SignOperation.deriveKeyMaterial(address, domain, info, length)
+            operations = listOf(SignOperation.deriveKeyMaterial(address, domain, info, length))
             description = getString(R.string.confirm_derive_passkey, domain.removePrefix(KeyDerivation.DOMAIN_PREFIX))
         } else if (transaction != null) {
             // Show what the transaction does, and refuse one the vault would not sign anyway
             val decoded = transactionDecoder.decode(transaction)?.takeIf { it.sender == address } ?: return null
-            operation = SignOperation.transaction(address, transaction)
+            operations = listOf(SignOperation.transaction(address, transaction))
             description = describe(decoded)
         } else {
             val data = intent.getByteArrayExtra(SeedVaultContract.EXTRA_DATA) ?: return null
-            operation = SignOperation.bytes(address, data)
+            operations = listOf(SignOperation.bytes(address, data))
             description = getString(R.string.confirm_sign_bytes, data.size)
         }
         val requestId =
             signApprovals.begin(
-                SignApprovalRequest(callerPackage, appLabel(callerPackage), operation, description),
+                SignApprovalRequest(callerPackage, appLabel(callerPackage), operations, description),
             )
         confirmRequestId = requestId
         return ConfirmSign(requestId)
@@ -168,5 +185,6 @@ class MainActivity : FragmentActivity() {
 
     private companion object {
         const val MICRO_ALGO_DECIMALS = 6
+        const val MAX_BATCH_TRANSACTIONS = 16
     }
 }

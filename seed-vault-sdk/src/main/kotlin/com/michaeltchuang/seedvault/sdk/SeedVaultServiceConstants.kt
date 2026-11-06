@@ -20,6 +20,10 @@ object SeedVaultServiceConstants {
     const val EXTRA_ADDRESS = "address"
     const val EXTRA_DATA = "data"
     const val EXTRA_TRANSACTION = "transaction"
+    const val EXTRA_TRANSACTIONS = "transactions"
+
+    /** Most transactions one confirmation covers (the size of an Algorand group). */
+    const val MAX_BATCH_TRANSACTIONS = 16
     const val EXTRA_DOMAIN = "domain"
     const val EXTRA_INFO = "info"
     const val EXTRA_LENGTH = "length"
