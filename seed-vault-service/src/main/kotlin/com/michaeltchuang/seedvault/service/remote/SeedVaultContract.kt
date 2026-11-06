@@ -26,6 +26,9 @@ object SeedVaultContract {
     const val EXTRA_ADDRESS = "address"
     const val EXTRA_DATA = "data"
     const val EXTRA_TRANSACTION = "transaction"
+
+    /** Base64 transactions (a string array list) approved with one confirmation, then signed one by one with signTransaction. */
+    const val EXTRA_TRANSACTIONS = "transactions"
     const val EXTRA_DOMAIN = "domain"
     const val EXTRA_INFO = "info"
     const val EXTRA_LENGTH = "length"

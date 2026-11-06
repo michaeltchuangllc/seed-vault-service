@@ -161,6 +161,25 @@ class SeedVaultServiceClient(
         transaction: ByteArray,
     ): Intent = confirmSignIntent(address).putExtra(SeedVaultServiceConstants.EXTRA_TRANSACTION, transaction)
 
+    /**
+     * One confirmation for several transactions of [address], e.g. the transactions of an Algorand group.
+     * After RESULT_OK call [signTransaction] for each of them within a minute, with exactly these bytes.
+     * Needs a Seed Vault app that has this ([SeedVaultServiceConstants.EXTRA_TRANSACTIONS]); an older one refuses
+     * the screen, so fall back to [confirmSignTransactionIntent] for each transaction.
+     */
+    fun confirmSignTransactionsIntent(
+        address: String,
+        transactions: List<ByteArray>,
+    ): Intent {
+        require(transactions.isNotEmpty() && transactions.size <= SeedVaultServiceConstants.MAX_BATCH_TRANSACTIONS) {
+            "A confirmation covers 1 to ${SeedVaultServiceConstants.MAX_BATCH_TRANSACTIONS} transactions"
+        }
+        return confirmSignIntent(address).putStringArrayListExtra(
+            SeedVaultServiceConstants.EXTRA_TRANSACTIONS,
+            ArrayList(transactions.map { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) }),
+        )
+    }
+
     /** Same for [deriveKeyMaterial]: pass the same values to it after RESULT_OK. */
     fun confirmDeriveKeyMaterialIntent(
         address: String,

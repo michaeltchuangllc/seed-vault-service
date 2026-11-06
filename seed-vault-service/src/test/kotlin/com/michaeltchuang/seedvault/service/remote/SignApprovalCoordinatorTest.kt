@@ -26,6 +26,42 @@ class SignApprovalCoordinatorTest {
     }
 
     @Test
+    fun oneApprovalCoversEveryTransactionOfABatchOnce() {
+        val batch = (1..3).map { SignOperation.transaction("ADDRESS", byteArrayOf(it.toByte())) }
+        val id = coordinator.begin(SignApprovalRequest("client", "Client", batch, "Sign 3 transactions together"))
+
+        coordinator.resolve(id, approved = true)
+
+        batch.forEach { assertTrue(coordinator.consume(setOf("client"), it)) }
+        batch.forEach { assertFalse(coordinator.consume(setOf("client"), it)) }
+    }
+
+    @Test
+    fun aBatchApprovalDoesNotCoverAnotherTransaction() {
+        val batch = listOf(SignOperation.transaction("ADDRESS", byteArrayOf(1)))
+        coordinator.resolve(coordinator.begin(SignApprovalRequest("client", "Client", batch, "x")), approved = true)
+
+        assertFalse(coordinator.consume(setOf("client"), SignOperation.transaction("ADDRESS", byteArrayOf(2))))
+    }
+
+    @Test
+    fun aDeniedBatchGrantsNothing() {
+        val batch = listOf(SignOperation.transaction("ADDRESS", byteArrayOf(1)), SignOperation.transaction("ADDRESS", byteArrayOf(2)))
+        coordinator.resolve(coordinator.begin(SignApprovalRequest("client", "Client", batch, "x")), approved = false)
+
+        batch.forEach { assertFalse(coordinator.consume(setOf("client"), it)) }
+    }
+
+    @Test
+    fun aBatchMustBeForOneAccount() {
+        val mixed = listOf(SignOperation.transaction("A", byteArrayOf(1)), SignOperation.transaction("B", byteArrayOf(1)))
+
+        val failure = runCatching { SignApprovalRequest("client", "Client", mixed, "x") }.exceptionOrNull()
+
+        assertTrue("Got $failure", failure is IllegalArgumentException)
+    }
+
+    @Test
     fun deniedOperationCannotBeUsed() {
         coordinator.resolve(begin(), approved = false)
 

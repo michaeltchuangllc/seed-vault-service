@@ -8,9 +8,24 @@ import java.util.concurrent.ConcurrentHashMap
 internal class SignApprovalRequest(
     val callerPackage: String,
     val appLabel: String,
-    val operation: SignOperation,
+    /** Everything one approval allows. More than one for a batch of transactions that are approved together. */
+    val operations: List<SignOperation>,
     val description: String,
 ) {
+    init {
+        require(operations.isNotEmpty() && operations.map { it.address }.distinct().size == 1) {
+            "An approval is for one signing account"
+        }
+    }
+
+    constructor(
+        callerPackage: String,
+        appLabel: String,
+        operation: SignOperation,
+        description: String,
+    ) : this(callerPackage, appLabel, listOf(operation), description)
+
+    val operation: SignOperation get() = operations.first()
     val decision = CompletableDeferred<Boolean>()
 }
 
@@ -48,7 +63,7 @@ internal class SignApprovalCoordinator(
         approved: Boolean,
     ) {
         val request = pending.remove(id) ?: return
-        if (approved) grants[Grant(request.callerPackage, request.operation)] = clock() + grantMillis
+        if (approved) request.operations.forEach { grants[Grant(request.callerPackage, it)] = clock() + grantMillis }
         request.decision.complete(approved)
     }
 
