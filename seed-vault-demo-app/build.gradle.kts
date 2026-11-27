@@ -72,6 +72,9 @@ dependencies {
     // Android - needed for Material theme in AndroidManifest
     implementation(libs.material)
 
+    // Checks the light client in the background every 15 minutes
+    implementation("androidx.work:work-runtime-ktx:2.10.2")
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)

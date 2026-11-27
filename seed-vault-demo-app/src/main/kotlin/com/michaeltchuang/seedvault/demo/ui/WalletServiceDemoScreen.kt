@@ -89,6 +89,11 @@ fun WalletServiceDemoScreen(
                     onClick = { selectedTab = 1 },
                     text = { Text("Solana") },
                 )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Algo Light Client") },
+                )
             }
 
             Column(
@@ -102,7 +107,8 @@ fun WalletServiceDemoScreen(
             ) {
                 when (selectedTab) {
                     0 -> AlgorandTab(uiState, viewModel, onAuthorizeApp)
-                    else -> SolanaTab(uiState, viewModel)
+                    1 -> SolanaTab(uiState, viewModel)
+                    else -> LightClientTab()
                 }
             }
         }

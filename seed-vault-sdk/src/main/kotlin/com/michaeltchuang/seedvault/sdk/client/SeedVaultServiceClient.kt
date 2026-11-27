@@ -7,9 +7,12 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
 import com.michaeltchuang.seedvault.sdk.SeedVaultServiceConstants
+import com.michaeltchuang.seedvault.sdk.domain.model.LightClientStatus
 import com.michaeltchuang.seedvault.sdk.domain.model.SeedVaultSeed
+import com.michaeltchuang.seedvault.sdk.domain.model.StateProof
 import com.michaeltchuang.seedvault.service.ISeedVaultService
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -135,6 +138,42 @@ class SeedVaultServiceClient(
             requireService().deriveKeyMaterial(address, domain, info, length)
         } catch (e: android.os.RemoteException) {
             throw UnsupportedOperationException("This Seed Vault app does not support deriveKeyMaterial", e)
+        }
+
+    /**
+     * What the Seed Vault light client has verified for [network] ("TESTNET" or "MAINNET"). Needs only the
+     * ACCESS_SEED_VAULT permission. Most apps should use
+     * [com.michaeltchuang.seedvault.sdk.data.repository.LightClientRepository], which also fetches the state
+     * proofs. Throws IllegalStateException if the Trusty applet cannot run it, and UnsupportedOperationException
+     * if the installed Seed Vault app is too old to have a light client.
+     */
+    fun getLightClientStatus(network: String): LightClientStatus = lightClient { json.decodeFromString(it.getLightClientStatus(network)) }
+
+    /** Starts the light client of [network] from the state proof the vault knows. Does nothing if it already runs. */
+    fun startLightClient(network: String): LightClientStatus = lightClient { json.decodeFromString(it.startLightClient(network)) }
+
+    /**
+     * Throws away what the light client of [network] has verified and starts it again from the state proof the
+     * vault knows. For a light client that is stuck.
+     */
+    fun resetLightClient(network: String): LightClientStatus = lightClient { json.decodeFromString(it.resetLightClient(network)) }
+
+    /**
+     * Has the light client of [network] verify [stateProof], which must be the one for its next interval
+     * (`nextRound` to `nextRound + intervalSize - 1` of the status). Throws IllegalArgumentException if it is
+     * for another interval and IllegalStateException if the applet does not accept it.
+     */
+    fun advanceLightClient(
+        network: String,
+        stateProof: StateProof,
+    ): LightClientStatus =
+        lightClient { json.decodeFromString(it.advanceLightClient(network, json.encodeToString(stateProof.message), stateProof.proof)) }
+
+    private fun <T> lightClient(call: (ISeedVaultService) -> T): T =
+        try {
+            call(requireService())
+        } catch (e: android.os.RemoteException) {
+            throw UnsupportedOperationException("This Seed Vault app does not support the light client", e)
         }
 
     /** Intent for the authorization screen. Start it with startActivityForResult. */

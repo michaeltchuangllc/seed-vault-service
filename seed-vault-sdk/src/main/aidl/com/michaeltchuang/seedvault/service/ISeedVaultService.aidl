@@ -86,4 +86,45 @@ interface ISeedVaultService {
      * @throws UnsupportedOperationException if the keys of the seed cannot derive
      */
     byte[] deriveKeyMaterial(String address, String domain, in byte[] info, int length);
+
+    /**
+     * Light client: follows an Algorand network inside the Trusty applet, verifying a state proof (one every
+     * 256 rounds, about 12 minutes) at a time, so an app can check a transaction without trusting a node.
+     * The vault does not use the network, so an app fetches the state proofs from algod and sends them with
+     * advanceLightClient. The applet verifies every proof, so a wrong one is only refused. These calls only
+     * need the ACCESS_SEED_VAULT permission: they use public chain data and no seed. Added after
+     * deriveKeyMaterial, so the transaction codes of the methods above did not change; an older Seed Vault
+     * app does not have them.
+     *
+     * Each of the four returns JSON {network, started, emulated, verifiedUpToRound, earliestRound, nextRound,
+     * intervalSize, capacity, lnProvenWeight, votersCommitment (Base64), anchorRound}. network is
+     * "TESTNET" or "MAINNET". started false means the light client is not started yet. emulated true means this
+     * device has no Trusty applet, so the light client runs in the Seed Vault app's process instead of the TEE.
+     *
+     * @throws IllegalArgumentException if the network is unknown
+     * @throws IllegalStateException if the light client cannot be used (the message says why)
+     */
+    String getLightClientStatus(String network);
+
+    /** Starts the light client of the network from the state proof the vault knows. Does nothing if it already runs. */
+    String startLightClient(String network);
+
+    /**
+     * Has the light client verify the state proof for its next interval (nextRound to nextRound +
+     * intervalSize - 1, see getLightClientStatus). Fetch it from algod with GET /v2/stateproofs/{last round}.
+     * @param message the "Message" of algod's answer as it is, JSON {BlockHeadersCommitment,
+     * VotersCommitment (both Base64), LnProvenWeight, FirstAttestedRound, LastAttestedRound}
+     * @param stateProof the "StateProof" of algod's answer, Base64 decoded
+     * @throws IllegalArgumentException if the proof is not for the next interval
+     * @throws IllegalStateException if the light client is not started, or the applet does not accept the proof
+     */
+    String advanceLightClient(String network, String message, in byte[] stateProof);
+
+    /**
+     * Throws away what the light client of the network has verified and starts it again from the state proof
+     * the vault knows, so the next advanceLightClient is for the interval after that one. For a light client
+     * that is stuck. Needs only the ACCESS_SEED_VAULT permission like the others: the worst an app can do with
+     * it is make the light client verify state proofs again.
+     */
+    String resetLightClient(String network);
 }
