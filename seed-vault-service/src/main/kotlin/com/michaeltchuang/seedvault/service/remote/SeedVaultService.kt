@@ -7,6 +7,10 @@ import android.os.Binder
 import android.os.IBinder
 import android.util.Base64
 import com.michaeltchuang.seedvault.service.ISeedVaultService
+import com.michaeltchuang.seedvault.service.data.lightclient.LightClientEngine
+import com.michaeltchuang.seedvault.service.data.lightclient.LightClientNetwork
+import com.michaeltchuang.seedvault.service.data.lightclient.LightClientProgress
+import com.michaeltchuang.seedvault.service.data.lightclient.StateProofInput
 import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
 import com.michaeltchuang.seedvault.service.domain.model.AUTOSIGN_ADDRESS_INDEX
 import com.michaeltchuang.seedvault.service.domain.model.VaultSeed
@@ -19,6 +23,7 @@ import com.michaeltchuang.seedvault.service.domain.vault.KeyDerivation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.android.ext.android.inject
@@ -40,6 +45,7 @@ class SeedVaultService : Service() {
     private val signApprovals: SignApprovalCoordinator by inject()
     private val transactionDecoder: TransactionDecoder by inject()
     private val autosignSettings: AutosignSettings by inject()
+    private val lightClients: List<LightClientEngine> by inject()
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -103,6 +109,95 @@ class SeedVaultService : Service() {
                     deriveKeyMaterialUseCase(address, domain, info, length)
                 }
             }
+
+            override fun getLightClientStatus(network: String): String {
+                enforceCallerPermission()
+                val engine = lightClient(network)
+                return lightClientCall(engine) { engine.progress() }
+            }
+
+            override fun startLightClient(network: String): String {
+                enforceCallerPermission()
+                val engine = lightClient(network)
+                return lightClientCall(engine) { engine.start() }
+            }
+
+            override fun resetLightClient(network: String): String {
+                enforceCallerPermission()
+                val engine = lightClient(network)
+                return lightClientCall(engine) { engine.reset() }
+            }
+
+            override fun advanceLightClient(
+                network: String,
+                message: String,
+                stateProof: ByteArray,
+            ): String {
+                enforceCallerPermission()
+                val engine = lightClient(network)
+                val parsed =
+                    try {
+                        Json.decodeFromString<RemoteStateProofMessage>(message)
+                    } catch (e: SerializationException) {
+                        throw IllegalArgumentException("The state proof message is not valid", e)
+                    }
+                val input =
+                    StateProofInput(
+                        blockHeadersCommitment = Base64.decode(parsed.blockHeadersCommitment, Base64.DEFAULT),
+                        votersCommitment = Base64.decode(parsed.votersCommitment, Base64.DEFAULT),
+                        lnProvenWeight = parsed.lnProvenWeight,
+                        firstAttestedRound = parsed.firstAttestedRound,
+                        lastAttestedRound = parsed.lastAttestedRound,
+                    )
+                return lightClientCall(engine) { engine.advance(input, stateProof) }
+            }
+        }
+
+    private fun lightClient(network: String): LightClientEngine {
+        val known =
+            LightClientNetwork.entries.firstOrNull { it.name == network } ?: throw IllegalArgumentException("Unknown network $network")
+        return lightClients.first { it.network == known }
+    }
+
+    /**
+     * Runs a light client command and returns the status as JSON. Mistakes of the caller keep their type,
+     * any other failure (no applet, a proof the program refuses) is an IllegalStateException with the reason.
+     */
+    private fun lightClientCall(
+        engine: LightClientEngine,
+        command: suspend () -> LightClientProgress?,
+    ): String =
+        try {
+            val progress = runBlocking(Dispatchers.IO) { command() }
+            Json.encodeToString(progress.toRemote(engine.network))
+        } catch (e: IllegalArgumentException) {
+            throw e
+        } catch (e: Throwable) {
+            throw IllegalStateException(e.message ?: e::class.java.simpleName)
+        }
+
+    private fun LightClientProgress?.toRemote(network: LightClientNetwork) =
+        if (this == null) {
+            RemoteLightClientStatus(
+                network = network.name,
+                started = false,
+                intervalSize = LightClientNetwork.INTERVAL_SIZE,
+                anchorRound = network.anchorRound,
+            )
+        } else {
+            RemoteLightClientStatus(
+                network = network.name,
+                started = true,
+                emulated = emulated,
+                verifiedUpToRound = verifiedUpToRound,
+                earliestRound = earliestRound,
+                nextRound = nextRound,
+                intervalSize = LightClientNetwork.INTERVAL_SIZE,
+                capacity = capacity,
+                lnProvenWeight = lnProvenWeight,
+                votersCommitment = Base64.encodeToString(votersCommitment, Base64.NO_WRAP),
+                anchorRound = network.anchorRound,
+            )
         }
 
     private fun enforceCallerPermission() {

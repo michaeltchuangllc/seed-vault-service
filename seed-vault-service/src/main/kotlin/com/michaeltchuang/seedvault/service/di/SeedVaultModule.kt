@@ -4,6 +4,7 @@ import com.michaeltchuang.seedvault.service.data.auth.OsUserAuthenticator
 import com.michaeltchuang.seedvault.service.data.auth.TrustyUserAuthenticator
 import com.michaeltchuang.seedvault.service.data.auth.UserAuthenticators
 import com.michaeltchuang.seedvault.service.data.database.SeedVaultDatabase
+import com.michaeltchuang.seedvault.service.data.lightclient.lightClientEngines
 import com.michaeltchuang.seedvault.service.data.repository.SeedVaultRepositoryImpl
 import com.michaeltchuang.seedvault.service.data.settings.AutosignSettings
 import com.michaeltchuang.seedvault.service.data.settings.SharedPreferencesAutosignSettings
@@ -61,6 +62,8 @@ val seedVaultModule =
         single { UserAuthenticators(trusty = TrustyUserAuthenticator(), os = OsUserAuthenticator(androidContext())) }
         single<AutosignSettings> { SharedPreferencesAutosignSettings(androidContext()) }
         single<SeedVaultRepository> { SeedVaultRepositoryImpl(get(), get<RoomSeedKeyVault>(), get<TrustySeedKeyVault>()) }
+
+        single { lightClientEngines(androidContext()) }
 
         single { SignApprovalCoordinator() }
         single<TransactionDecoder> { AlgokitTransactionDecoder }

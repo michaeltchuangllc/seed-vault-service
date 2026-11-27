@@ -15,6 +15,8 @@ import org.junit.Test
 import uniffi.seed_vault_ffi.Account
 import uniffi.seed_vault_ffi.AppletErrorCode
 import uniffi.seed_vault_ffi.KeyAlgorithm
+import uniffi.seed_vault_ffi.LightBlockHeaderProof
+import uniffi.seed_vault_ffi.LightClientStatus
 import uniffi.seed_vault_ffi.ListedAccount
 import uniffi.seed_vault_ffi.ProtocolVersion
 import uniffi.seed_vault_ffi.SeedVaultClientInterface
@@ -22,6 +24,9 @@ import uniffi.seed_vault_ffi.SeedVaultException
 import uniffi.seed_vault_ffi.SeedVaultStatus
 import uniffi.seed_vault_ffi.SignedArbitraryData
 import uniffi.seed_vault_ffi.SignedTransaction
+import uniffi.seed_vault_ffi.StateProofMessage
+import uniffi.seed_vault_ffi.TransactionProof
+import uniffi.seed_vault_ffi.WasmProgram
 
 class TrustySeedKeyVaultTest {
     private val applet = FakeApplet()
@@ -255,6 +260,67 @@ class TrustySeedKeyVaultTest {
         private fun accountOf(address: String) = accounts.first { it.address == address }
 
         override fun status() = status
+
+        // The vault does not use these, the light client and WASM calls have their own tests
+        override fun isEmulated() = false
+
+        override fun lightClientAdvance(
+            programId: ByteArray,
+            message: StateProofMessage,
+            stateProof: ByteArray,
+        ): ULong = error("not used")
+
+        override fun lightClientInit(
+            programId: ByteArray,
+            firstAttestedRound: ULong,
+            intervalSize: ULong,
+            capacity: ULong,
+            genesisVotersCommitment: ByteArray,
+            genesisLnProvenWeight: ULong,
+        ): Unit = error("not used")
+
+        override fun lightClientStatus(programId: ByteArray): LightClientStatus? = error("not used")
+
+        override fun lightClientVerifyTransaction(
+            programId: ByteArray,
+            txid: ByteArray,
+            round: ULong,
+            genesisHash: ByteArray,
+            seed: ByteArray,
+            transactionProof: TransactionProof,
+            lightBlockHeaderProof: LightBlockHeaderProof,
+        ): Unit = error("not used")
+
+        override fun wasmInstall(
+            module: ByteArray,
+            signedManifest: ByteArray?,
+        ): ByteArray = error("not used")
+
+        override fun wasmListPrograms(): List<WasmProgram> = error("not used")
+
+        override fun wasmProtocolVersion(): ProtocolVersion = error("not used")
+
+        override fun wasmPublicKey(
+            programId: ByteArray,
+            address: String,
+            addressIndex: UByte,
+        ): ByteArray = error("not used")
+
+        override fun wasmRevoke(signedRevocations: ByteArray): UInt = error("not used")
+
+        override fun wasmRun(
+            programId: ByteArray,
+            input: ByteArray,
+        ): ByteArray = error("not used")
+
+        override fun wasmSign(
+            programId: ByteArray,
+            address: String,
+            addressIndex: UByte,
+            message: ByteArray,
+        ): ByteArray = error("not used")
+
+        override fun wasmUnload(programId: ByteArray): Unit = error("not used")
 
         override fun importAccount(
             mnemonic: String,
